@@ -274,6 +274,10 @@
 .loc-btn{flex:1;font-size:14.5px;font-weight:700;padding:11px 6px;border-radius:11px;border:1.5px solid #dbe3ee;background:#f2f6fb;color:#2b3b52;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .loc-btn:active{transform:scale(.97)}
 .loc-pri{background:#2f86cf;border-color:#2f86cf;color:#fff}
+.loc-two{display:flex;gap:8px}
+.loc-two>div{flex:1}
+.loc-hint{font-size:11.5px;color:#8a97a8;line-height:1.6;margin-top:4px}
+.loc-hint b{color:#41506a;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -290,7 +294,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v1.9</span>
+      <span class="ver">v2.2</span>
     </div>
   </header>
 
@@ -345,13 +349,16 @@
 <div id="locOverlay" class="loc-ovl hidden" role="dialog" aria-label="Standort einstellen">
   <div class="loc-box">
     <div class="loc-h">Standort</div>
-    <label for="locLat">Breite (Dezimalgrad) &middot; oder Google-Maps-Koordinaten einf&uuml;gen</label><input id="locLat" type="text" inputmode="decimal" autocomplete="off" placeholder="(49.2491497, 8.0761806)">
-    <label for="locLon">L&auml;nge (Dezimalgrad)</label><input id="locLon" type="text" inputmode="decimal" autocomplete="off" placeholder="z.&nbsp;B. 8.6743">
-    <label for="locName">Ortsname</label><input id="locName" type="text" autocomplete="off" maxlength="40" placeholder="z.&nbsp;B. Norddeich">
+    <label for="locPaste">GPS aus Google&nbsp;Maps einf&uuml;gen</label><input id="locPaste" type="text" autocomplete="off" placeholder="(49.2491497, 8.0761806)">
+    <input id="locPaste2" type="text" autocomplete="off" placeholder="8FXC732F+29" style="margin-top:8px" aria-label="Plus Code aus Google Maps einf&uuml;gen">
+    <div class="loc-hint">Koordinaten oben oder Plus&nbsp;Code darunter einf&uuml;gen &ndash; Breite, L&auml;nge und Ortsname f&uuml;llen sich automatisch.</div>
+    <div class="loc-two">
+      <div><label for="locLat">Breite</label><input id="locLat" type="text" inputmode="decimal" autocomplete="off" placeholder="49.2508699"></div>
+      <div><label for="locLon">L&auml;nge</label><input id="locLon" type="text" inputmode="decimal" autocomplete="off" placeholder="8.0748439"></div>
+    </div>
+    <label for="locName">Ortsname</label><input id="locName" type="text" autocomplete="off" maxlength="40" placeholder="wird automatisch ermittelt">
     <div class="loc-msg" id="locMsg"></div>
     <div class="loc-row"><button type="button" id="locGps" class="loc-btn">Eigenen Standort verwenden</button></div>
-    <div class="loc-row"><button type="button" id="locClear" class="loc-btn">GPS-Daten eingeben</button></div>
-    <div class="loc-row"><button type="button" id="locFind" class="loc-btn">Ortsname suchen</button></div>
     <div class="loc-row"><button type="button" id="locWtb" class="loc-btn">Wettenberg</button><button type="button" id="locNdd" class="loc-btn">Norddeich</button></div>
     <div class="loc-row"><button type="button" id="locCancel" class="loc-btn">Abbrechen</button><button type="button" id="locApply" class="loc-btn loc-pri">&Uuml;bernehmen</button></div>
   </div>
@@ -2226,7 +2233,7 @@ load();
   if(!LOC.isWettenberg){const pn=el("placeName");if(pn)pn.textContent=LOC.name;}
   const ov=el("locOverlay"),msg=el("locMsg"),ap=el("locApply");
   if(!ov)return;
-  const show=()=>{el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
+  const show=()=>{el("locPaste").value="";el("locPaste2").value="";el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
   const hide=()=>ov.classList.add("hidden");
   el("locBtn").onclick=show;el("locCancel").onclick=hide;
   ov.addEventListener("click",e=>{if(e.target===ov)hide();});
@@ -2240,14 +2247,25 @@ load();
     for(let i=10;i<d.length;i++){rla/=5;rlo/=4;const ix=AB.indexOf(d[i]);la+=Math.floor(ix/4)*rla;lo+=(ix%4)*rlo;}
     return {lat:la+rla/2,lon:lo+rlo/2};
   }
-  function locSplit(id){ // v1.2/v1.6: Google-Maps-Koordinaten ODER Plus Code in beide Felder zerlegen
+  function locSplit(id,fromPaste){ // v2.0: Google-Maps-Koordinaten ODER Plus Code erkennen -> Felder + Ortsname automatisch
     const v=String(el(id).value);
     const oc=_olcDecode(v);
-    if(oc){el("locLat").value=oc.lat.toFixed(7);el("locLon").value=oc.lon.toFixed(7);msg.textContent="Plus Code erkannt und in Koordinaten umgerechnet.";return;}
-    if(/[23456789CFGHJMPQRVWX]{4,6}\+[23456789CFGHJMPQRVWX]{2}/i.test(v)&&!/\d{1,3}\./.test(v)){msg.textContent="Kurzer Plus Code erkannt \u2013 bitte den vollst\u00e4ndigen Code mit 8 Zeichen vor dem + verwenden (in Google Maps unter \u201ePlus Code\u201c).";return;}
-    const m=/\(?\s*(-?\d{1,3}\.\d+)\s*[,;\s]+\s*(-?\d{1,3}\.\d+)\s*\)?/.exec(v);
-    if(m){el("locLat").value=m[1];el("locLon").value=m[2];msg.textContent="Koordinaten erkannt und aufgeteilt.";}}
-  ["locLat","locLon","locName"].forEach(id=>el(id).addEventListener("input",()=>{delete ap.dataset.warned;msg.textContent="";if(id!=="locName")locSplit(id);}));
+    let la=null,lo=null;
+    if(oc){la=+oc.lat.toFixed(7);lo=+oc.lon.toFixed(7);}
+    else{
+      if(/[23456789CFGHJMPQRVWX]{4,6}\+[23456789CFGHJMPQRVWX]{2}/i.test(v)&&!/\d{1,3}\./.test(v)){msg.textContent="Kurzer Plus Code erkannt \u2013 bitte den vollst\u00e4ndigen Code mit 8 Zeichen vor dem + verwenden (in Google Maps unter \u201ePlus Code\u201c).";return;}
+      const m=/\(?\s*(-?\d{1,3}\.\d+)\s*[,;\s]+\s*(-?\d{1,3}\.\d+)\s*\)?/.exec(v);
+      if(m){la=parseFloat(m[1]);lo=parseFloat(m[2]);}
+    }
+    if(la===null)return;
+    el("locLat").value=la;el("locLon").value=lo;
+    if(fromPaste)el(id).value="";
+    msg.textContent=(oc?"Plus Code":"Koordinaten")+" erkannt \u2013 Ortsname wird gesucht \u2026";
+    autoName(la,lo);
+  }
+  ["locLat","locLon","locName"].forEach(id=>el(id).addEventListener("input",()=>{delete ap.dataset.warned;msg.textContent="";if(id!=="locName")locSplit(id,false);}));
+  el("locPaste").addEventListener("input",()=>{delete ap.dataset.warned;msg.textContent="";locSplit("locPaste",true);});
+  el("locPaste2").addEventListener("input",()=>{delete ap.dataset.warned;msg.textContent="";locSplit("locPaste2",true);});
   function saveGo(p){try{localStorage.setItem("locProfile",JSON.stringify(p));}catch(e){}
     location.href=location.pathname;} // Query-Parameter abwerfen, damit das gespeicherte Profil greift
   el("locWtb").onclick=()=>saveGo(LOC_WETTENBERG);
@@ -2256,38 +2274,35 @@ load();
     const la=parseFloat(String(el("locLat").value).trim().replace(",",".")),
           lo=parseFloat(String(el("locLon").value).trim().replace(",","."));
     if(!isFinite(la)||!isFinite(lo)||Math.abs(la)>89||Math.abs(lo)>180){msg.textContent="Bitte g\u00fcltige Dezimalgrad-Koordinaten eingeben (z.\u202fB. 53.6321 und 7.2141).";return;}
-    const name=_locSan(el("locName").value).trim()||la.toFixed(3)+"\u00b0 / "+lo.toFixed(3)+"\u00b0";
     const inDE=la>=47&&la<=55.2&&lo>=5.5&&lo<=15.5;
     if(!inDE&&!ap.dataset.warned){ap.dataset.warned="1";msg.textContent="Hinweis: Standort au\u00dferhalb Deutschlands \u2013 DWD-Teile (Stationsdaten, Warnungen) k\u00f6nnen entfallen, der Open-Meteo-Kern l\u00e4uft weltweit. Nochmal \u201e\u00dcbernehmen\u201c tippen zum Best\u00e4tigen.";return;}
-    saveGo({lat:la,lon:lo,name:name,isWettenberg:false});
+    const typed=_locSan(el("locName").value).trim();
+    if(typed){saveGo({lat:la,lon:lo,name:typed,isWettenberg:false});return;}
+    msg.textContent="Ortsname wird ermittelt \u2026";                    // v2.0: fehlenden Namen automatisch holen, dann speichern
+    autoName(la,lo,n=>saveGo({lat:la,lon:lo,name:n||la.toFixed(3)+"\u00b0 / "+lo.toFixed(3)+"\u00b0",isWettenberg:false}));
   };
-  el("locFind").onclick=()=>{ // v1.2: Reverse-Geocoding fuer eingegebene/eingefuegte Koordinaten (Nominatim/OSM, Einzelabfrage)
-    const la=parseFloat(String(el("locLat").value).trim().replace(",",".")),
-          lo=parseFloat(String(el("locLon").value).trim().replace(",","."));
-    if(!isFinite(la)||!isFinite(lo)||Math.abs(la)>89||Math.abs(lo)>180){msg.textContent="Bitte zuerst g\u00fcltige Koordinaten eingeben.";return;}
-    msg.textContent="Ortsname wird gesucht \u2026";
+  let _nmTok=0;
+  function autoName(la,lo,done){ // v2.0: Ortsname automatisch via Nominatim/OSM (interaktive Einzelabfrage, Token gegen veraltete Antworten)
+    const tok=++_nmTok;
     const to=new Promise(res=>setTimeout(()=>res(null),9000));
     Promise.race([
       fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=de&lat="+la+"&lon="+lo)
         .then(r=>r.ok?r.json():null).catch(()=>null),
       to
     ]).then(j=>{
+      if(tok!==_nmTok)return;
       const a=(j&&j.address)||{};
-      const n=a.village||a.town||a.city||a.municipality||a.county||"";
-      if(n){el("locName").value=_locSan(n);msg.textContent="Gefunden: "+_locSan(n)+" \u00b7 Quelle OpenStreetMap";}
+      const n=_locSan(a.village||a.town||a.city||a.municipality||a.county||"");
+      if(n){el("locName").value=n;msg.textContent="Ort: "+n+" \u00b7 Quelle OpenStreetMap";}
       else msg.textContent="Kein Ortsname gefunden \u2013 bitte manuell eintragen.";
+      if(done)done(n);
     });
-  };
-  el("locClear").onclick=()=>{ // v1.6: Felder leeren -> Eingabeformate werden sichtbar
-    el("locLat").value="";el("locLon").value="";el("locName").value="";delete ap.dataset.warned;
-    msg.textContent="Ins Breite-Feld einfügen: Google-Maps-Koordinaten „(49.2491497, 8.0761806)“ oder Plus Code „8FXC732F+29“ – wird automatisch zerlegt.";
-    el("locLat").focus();
-  };
+  }
   el("locGps").onclick=()=>{
     if(!navigator.geolocation){msg.textContent="GPS ist auf diesem Ger\u00e4t nicht verf\u00fcgbar \u2013 Koordinaten bitte manuell eingeben.";return;}
     msg.textContent="GPS wird abgefragt \u2026";
     navigator.geolocation.getCurrentPosition(
-      p=>{el("locLat").value=p.coords.latitude.toFixed(5);el("locLon").value=p.coords.longitude.toFixed(5);delete ap.dataset.warned;msg.textContent="Position \u00fcbernommen \u2013 Ortsname optional eintragen, dann \u201e\u00dcbernehmen\u201c.";},
+      p=>{el("locLat").value=p.coords.latitude.toFixed(5);el("locLon").value=p.coords.longitude.toFixed(5);delete ap.dataset.warned;msg.textContent="Position \u00fcbernommen \u2013 Ortsname wird gesucht \u2026";autoName(p.coords.latitude,p.coords.longitude);},
       e=>{msg.textContent=e&&e.code===1?"GPS-Zugriff wurde abgelehnt. Koordinaten bitte manuell eingeben.":"GPS-Position nicht verf\u00fcgbar. Koordinaten bitte manuell eingeben.";},
       {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   };
