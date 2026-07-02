@@ -290,7 +290,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v1.4</span>
+      <span class="ver">v1.6</span>
     </div>
   </header>
 
@@ -349,7 +349,8 @@
     <label for="locLon">L&auml;nge (Dezimalgrad)</label><input id="locLon" type="text" inputmode="decimal" autocomplete="off" placeholder="z.&nbsp;B. 8.6743">
     <label for="locName">Ortsname</label><input id="locName" type="text" autocomplete="off" maxlength="40" placeholder="z.&nbsp;B. Norddeich">
     <div class="loc-msg" id="locMsg"></div>
-    <div class="loc-row"><button type="button" id="locGps" class="loc-btn">GPS verwenden</button></div>
+    <div class="loc-row"><button type="button" id="locGps" class="loc-btn">Eigenen Standort verwenden</button></div>
+    <div class="loc-row"><button type="button" id="locClear" class="loc-btn">GPS-Daten eingeben</button></div>
     <div class="loc-row"><button type="button" id="locFind" class="loc-btn">Ortsname suchen</button></div>
     <div class="loc-row"><button type="button" id="locWtb" class="loc-btn">Wettenberg</button><button type="button" id="locNdd" class="loc-btn">Norddeich</button></div>
     <div class="loc-row"><button type="button" id="locCancel" class="loc-btn">Abbrechen</button><button type="button" id="locApply" class="loc-btn loc-pri">&Uuml;bernehmen</button></div>
@@ -1905,7 +1906,7 @@ function drawWolken(){
       const R=[put[2][0]-18,put[2][1]-18,put[2][2]+18,put[2][3]+18]; // 18px-Umfeld (v1.4: 12->18 gegen dichte Label-Spalten an Randpunkten)
       let nb=0;for(const q of labRects)if(!(R[2]<q[0]||R[0]>q[2]||R[3]<q[1]||R[1]>q[3]))nb++;
       if(nb>=2)return;                                             // v1.3: Bildraum-Trio-Sperre -> Ort ganz weglassen
-      x.fillStyle="rgba(255,255,255,.95)";x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fill();
+      x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fillStyle="rgba(255,255,255,.95)";x.fill();x.lineWidth=1.4;x.strokeStyle="rgba(0,0,0,.55)";x.stroke(); // v1.5: dunkler Ring wie Label-Kontur
       x.textAlign="left";x.textBaseline="middle";
       x.lineWidth=3.2;x.strokeStyle="rgba(0,0,0,.6)";x.strokeText(ci.n,put[0],put[1]);
       x.fillStyle="#fff";x.fillText(ci.n,put[0],put[1]);
@@ -2189,8 +2190,22 @@ load();
   const hide=()=>ov.classList.add("hidden");
   el("locBtn").onclick=show;el("locCancel").onclick=hide;
   ov.addEventListener("click",e=>{if(e.target===ov)hide();});
-  function locSplit(id){ // v1.2: "(49.2467293, 8.0743356)" aus Google Maps in beide Felder zerlegen
-    const m=/\(?\s*(-?\d{1,3}\.\d+)\s*[,;\s]+\s*(-?\d{1,3}\.\d+)\s*\)?/.exec(String(el(id).value));
+  function _olcDecode(code){ // v1.6: Plus Code (Open Location Code), Vollcodes offline; verifiziert gegen Referenz-Lib
+    const AB="23456789CFGHJMPQRVWX";
+    const m=String(code).toUpperCase().match(/([23456789CFGHJMPQRVWX]{8})\+([23456789CFGHJMPQRVWX]{2,7})/);
+    if(!m)return null;
+    const d=(m[1]+m[2]).split("");
+    let la=-90,lo=-180,rla=20,rlo=20;
+    for(let i=0;i<10;i+=2){la+=AB.indexOf(d[i])*rla;lo+=AB.indexOf(d[i+1])*rlo;if(i<8){rla/=20;rlo/=20;}}
+    for(let i=10;i<d.length;i++){rla/=5;rlo/=4;const ix=AB.indexOf(d[i]);la+=Math.floor(ix/4)*rla;lo+=(ix%4)*rlo;}
+    return {lat:la+rla/2,lon:lo+rlo/2};
+  }
+  function locSplit(id){ // v1.2/v1.6: Google-Maps-Koordinaten ODER Plus Code in beide Felder zerlegen
+    const v=String(el(id).value);
+    const oc=_olcDecode(v);
+    if(oc){el("locLat").value=oc.lat.toFixed(7);el("locLon").value=oc.lon.toFixed(7);msg.textContent="Plus Code erkannt und in Koordinaten umgerechnet.";return;}
+    if(/[23456789CFGHJMPQRVWX]{4,6}\+[23456789CFGHJMPQRVWX]{2}/i.test(v)&&!/\d{1,3}\./.test(v)){msg.textContent="Kurzer Plus Code erkannt \u2013 bitte den vollst\u00e4ndigen Code mit 8 Zeichen vor dem + verwenden (in Google Maps unter \u201ePlus Code\u201c).";return;}
+    const m=/\(?\s*(-?\d{1,3}\.\d+)\s*[,;\s]+\s*(-?\d{1,3}\.\d+)\s*\)?/.exec(v);
     if(m){el("locLat").value=m[1];el("locLon").value=m[2];msg.textContent="Koordinaten erkannt und aufgeteilt.";}}
   ["locLat","locLon","locName"].forEach(id=>el(id).addEventListener("input",()=>{delete ap.dataset.warned;msg.textContent="";if(id!=="locName")locSplit(id);}));
   function saveGo(p){try{localStorage.setItem("locProfile",JSON.stringify(p));}catch(e){}
@@ -2222,6 +2237,11 @@ load();
       if(n){el("locName").value=_locSan(n);msg.textContent="Gefunden: "+_locSan(n)+" \u00b7 Quelle OpenStreetMap";}
       else msg.textContent="Kein Ortsname gefunden \u2013 bitte manuell eintragen.";
     });
+  };
+  el("locClear").onclick=()=>{ // v1.6: Felder leeren -> Eingabeformate werden sichtbar
+    el("locLat").value="";el("locLon").value="";el("locName").value="";delete ap.dataset.warned;
+    msg.textContent="Ins Breite-Feld einfügen: Google-Maps-Koordinaten „(49.2491497, 8.0761806)“ oder Plus Code „8FXC732F+29“ – wird automatisch zerlegt.";
+    el("locLat").focus();
   };
   el("locGps").onclick=()=>{
     if(!navigator.geolocation){msg.textContent="GPS ist auf diesem Ger\u00e4t nicht verf\u00fcgbar \u2013 Koordinaten bitte manuell eingeben.";return;}
