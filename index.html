@@ -290,7 +290,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v1.2</span>
+      <span class="ver">v1.4</span>
     </div>
   </header>
 
@@ -345,7 +345,7 @@
 <div id="locOverlay" class="loc-ovl hidden" role="dialog" aria-label="Standort einstellen">
   <div class="loc-box">
     <div class="loc-h">Standort</div>
-    <label for="locLat">Breite (Dezimalgrad)</label><input id="locLat" type="text" inputmode="decimal" autocomplete="off" placeholder="z.&nbsp;B. 50.6481">
+    <label for="locLat">Breite (Dezimalgrad) &middot; oder Google-Maps-Koordinaten einf&uuml;gen</label><input id="locLat" type="text" inputmode="decimal" autocomplete="off" placeholder="(49.2491497, 8.0761806)">
     <label for="locLon">L&auml;nge (Dezimalgrad)</label><input id="locLon" type="text" inputmode="decimal" autocomplete="off" placeholder="z.&nbsp;B. 8.6743">
     <label for="locName">Ortsname</label><input id="locName" type="text" autocomplete="off" maxlength="40" placeholder="z.&nbsp;B. Norddeich">
     <div class="loc-msg" id="locMsg"></div>
@@ -1363,28 +1363,99 @@ const WOLK=(function(){ // 10x10 Kachelzentren (v2.31: aeusserer Kranz weg, -31%
 })();
 const WOLK_TILE="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const HOME_LAT=LOC.lat, HOME_LON=LOC.lon;   // Standort aus LOC-Profil: Karten-Pin + Astronomie (Wetter nutzt im Wettenberg-Profil stationsnahe LAT/LON)
-const WOLK_CITIES=[
-  {n:"Biedenkopf",la:50.91,lo:8.53},
-  {n:"Siegen",la:50.88,lo:8.02},
-  {n:"Marburg",la:50.81,lo:8.77,b:1},
-  {n:"Alsfeld",la:50.75,lo:9.27},
-  {n:"Herborn",la:50.68,lo:8.30},
-  {n:"Lauterbach",la:50.64,lo:9.40},
-  {n:"Gie\u00dfen",la:50.58,lo:8.68,b:1},
-  {n:"Weilburg",la:50.48,lo:8.26},
-  {n:"Limburg",la:50.39,lo:8.06},
-  {n:"Friedberg",la:50.34,lo:8.76},
-  {n:"Hanau",la:50.13,lo:8.92},
-  {n:"Frankfurt",la:50.11,lo:8.68,b:1},
-  {n:"Wiesbaden",la:50.08,lo:8.24,b:1},
-  /* Norddeich-Region (v1.1): gemeinsamer Pool, das Kartenfenster filtert selbst */
-  {n:"Borkum",la:53.59,lo:6.66},{n:"Juist",la:53.68,lo:7.00},{n:"Norderney",la:53.71,lo:7.15},
-  {n:"Baltrum",la:53.73,lo:7.37},{n:"Langeoog",la:53.75,lo:7.48},{n:"Spiekeroog",la:53.77,lo:7.70},
-  {n:"Wangerooge",la:53.79,lo:7.90},
-  {n:"Norden",la:53.60,lo:7.20},{n:"Emden",la:53.37,lo:7.21,b:1},{n:"Aurich",la:53.47,lo:7.48},
-  {n:"Leer",la:53.23,lo:7.45},{n:"Esens",la:53.65,lo:7.61},{n:"Wittmund",la:53.58,lo:7.78},
-  {n:"Jever",la:53.57,lo:7.90},{n:"Wilhelmshaven",la:53.52,lo:8.11,b:1},
-  {n:"Delfzijl",la:53.33,lo:6.93},{n:"Groningen",la:53.22,lo:6.57,b:1}
+const WOLK_CITIES=[ /* v1.3: 30 kuratierte Orte (Vorrang) + Raster-Auswahl DE+Nachbarn (33-km-Zellen, >=15k Einw.), Duplikate <5 km entfernt */
+  {n:"Biedenkopf",la:50.91,lo:8.53},{n:"Siegen",la:50.88,lo:8.02},{n:"Marburg",la:50.81,lo:8.77,b:1},{n:"Alsfeld",la:50.75,lo:9.27},{n:"Herborn",la:50.68,lo:8.30},
+  {n:"Lauterbach",la:50.64,lo:9.40},{n:"Gie\u00dfen",la:50.58,lo:8.68,b:1},{n:"Weilburg",la:50.48,lo:8.26},{n:"Limburg",la:50.39,lo:8.06},{n:"Friedberg",la:50.34,lo:8.76},
+  {n:"Hanau",la:50.13,lo:8.92},{n:"Frankfurt",la:50.11,lo:8.68,b:1},{n:"Wiesbaden",la:50.08,lo:8.24,b:1},{n:"Borkum",la:53.59,lo:6.66},{n:"Juist",la:53.68,lo:7.00},
+  {n:"Norderney",la:53.71,lo:7.15},{n:"Baltrum",la:53.73,lo:7.37},{n:"Langeoog",la:53.75,lo:7.48},{n:"Spiekeroog",la:53.77,lo:7.70},{n:"Wangerooge",la:53.79,lo:7.90},
+  {n:"Norden",la:53.60,lo:7.20},{n:"Emden",la:53.37,lo:7.21,b:1},{n:"Aurich",la:53.47,lo:7.48},{n:"Leer",la:53.23,lo:7.45},{n:"Esens",la:53.65,lo:7.61},
+  {n:"Wittmund",la:53.58,lo:7.78},{n:"Jever",la:53.57,lo:7.90},{n:"Wilhelmshaven",la:53.52,lo:8.11,b:1},{n:"Delfzijl",la:53.33,lo:6.93},{n:"Groningen",la:53.22,lo:6.57,b:1},
+  {n:"Innsbruck",la:47.26,lo:11.39,b:1},{n:"Graz",la:47.07,lo:15.45,b:1},{n:"Wels",la:48.17,lo:14.03},{n:"Villach",la:46.61,lo:13.86},{n:"Telfs",la:47.31,lo:11.07},
+  {n:"Linz",la:48.31,lo:14.29,b:1},{n:"Sankt P\u00f6lten",la:48.20,lo:15.63},{n:"Klagenfurt am W\u00f6rthersee",la:46.62,lo:14.31,b:1},{n:"Salzburg",la:47.80,lo:13.04,b:1},{n:"Saalfelden am Steinernen Meer",la:47.43,lo:12.85},
+  {n:"Dornbirn",la:47.41,lo:9.74},{n:"Sankt Gallen",la:47.42,lo:9.37},{n:"Bregenz",la:47.50,lo:9.75},{n:"Amstetten",la:48.12,lo:14.87},{n:"Beringen",la:51.05,lo:5.23},
+  {n:"Geel",la:51.17,lo:4.99},{n:"Aachen",la:50.78,lo:6.08,b:1},{n:"Verviers",la:50.59,lo:5.86},{n:"Tilburg",la:51.56,lo:5.09,b:1},{n:"Hasselt",la:50.93,lo:5.34},
+  {n:"Tienen",la:50.81,lo:4.94},{n:"Li\u00e8ge",la:50.63,lo:5.57,b:1},{n:"Marche-en-Famenne",la:50.23,lo:5.34},{n:"Weert",la:51.25,lo:5.71},{n:"Arlon",la:49.68,lo:5.82},
+  {n:"Andenne",la:50.49,lo:5.10},{n:"Z\u00fcrich",la:47.37,lo:8.55,b:1},{n:"Yverdon-les-Bains",la:46.78,lo:6.64},{n:"Winterthur",la:47.51,lo:8.72,b:1},{n:"Konstanz",la:47.66,lo:9.18},
+  {n:"Rapperswil",la:47.23,lo:8.82},{n:"Waldshut-Tiengen",la:47.62,lo:8.22},{n:"Thun",la:46.75,lo:7.62},{n:"Solothurn",la:47.21,lo:7.54},{n:"Luzern",la:47.05,lo:8.31},
+  {n:"Aarau",la:47.39,lo:8.04},{n:"La Chaux-de-Fonds",la:47.10,lo:6.83},{n:"Basel",la:47.56,lo:7.57,b:1},{n:"Littau",la:47.05,lo:8.26},{n:"Bern",la:46.95,lo:7.45,b:1},
+  {n:"Biel/Bienne",la:47.14,lo:7.25},{n:"Fribourg",la:46.80,lo:7.15},{n:"Einsiedeln",la:47.13,lo:8.75},{n:"Chur",la:46.85,lo:9.53},{n:"Dv\u016fr Kr\u00e1lov\u00e9 nad Labem",la:50.43,lo:15.81},
+  {n:"Prague",la:50.09,lo:14.42,b:1},{n:"Havl\u00ed\u010dk\u016fv Brod",la:49.61,lo:15.58},{n:"\u017datec",la:50.33,lo:13.55},{n:"Hole\u0161ovice",la:50.10,lo:14.45},{n:"Zittau",la:50.90,lo:14.81},
+  {n:"\u00dast\u00ed nad Labem",la:50.66,lo:14.03},{n:"Trutnov",la:50.56,lo:15.91},{n:"Jihlava",la:49.40,lo:15.59},{n:"Most",la:50.50,lo:13.64},{n:"T\u00e1bor",la:49.41,lo:14.66},
+  {n:"Strakonice",la:49.26,lo:13.90},{n:"Karlovy Vary",la:50.23,lo:12.87},{n:"Kladno",la:50.15,lo:14.10},{n:"\u0158epy",la:50.07,lo:14.30},{n:"P\u0159\u00edbram",la:49.69,lo:14.01},
+  {n:"Pilsen",la:49.75,lo:13.38,b:1},{n:"P\u00edsek",la:49.31,lo:14.15},{n:"Pelh\u0159imov",la:49.43,lo:15.22},{n:"Pardubice",la:50.04,lo:15.78},{n:"Mlad\u00e1 Boleslav",la:50.41,lo:14.90},
+  {n:"Liberec",la:50.77,lo:15.06,b:1},{n:"Kutn\u00e1 Hora",la:49.95,lo:15.27},{n:"Kol\u00edn",la:50.03,lo:15.20},{n:"Klatovy",la:49.40,lo:13.30},{n:"Kada\u0148",la:50.38,lo:13.27},
+  {n:"Chomutov",la:50.46,lo:13.42},{n:"Jind\u0159ich\u016fv Hradec",la:49.14,lo:15.00},{n:"Hradec Kr\u00e1lov\u00e9",la:50.21,lo:15.83},{n:"D\u011b\u010d\u00edn",la:50.78,lo:14.21},{n:"Cheb",la:50.08,lo:12.37},
+  {n:"\u010cesk\u00e9 Bud\u011bjovice",la:48.97,lo:14.47},{n:"\u010cesk\u00e1 L\u00edpa",la:50.69,lo:14.54},{n:"Bene\u0161ov",la:49.78,lo:14.69},{n:"Zwickau",la:50.73,lo:12.49},{n:"Homburg",la:49.33,lo:7.34},
+  {n:"K\u00f6ln",la:50.93,lo:6.95,b:1},{n:"Lichterfelde",la:52.43,lo:13.31},{n:"N\u00fcrnberg",la:49.45,lo:11.08,b:1},{n:"Zerbst",la:51.97,lo:12.09},{n:"Wei\u00dfenfels",la:51.20,lo:11.97},
+  {n:"Bocholt",la:51.84,lo:6.62},{n:"Leipzig",la:51.34,lo:12.37,b:1},{n:"W\u00fcrzburg",la:49.79,lo:9.95,b:1},{n:"D\u00fcren",la:50.80,lo:6.49},{n:"Wuppertal",la:51.26,lo:7.15,b:1},
+  {n:"Garbsen",la:52.41,lo:9.59},{n:"D\u00fcsseldorf",la:51.22,lo:6.78,b:1},{n:"Karlsruhe",la:49.01,lo:8.40,b:1},{n:"Worms",la:49.63,lo:8.36},{n:"Wolfsburg",la:52.42,lo:10.78,b:1},
+  {n:"Starnberg",la:48.00,lo:11.34},{n:"Salzgitter",la:52.16,lo:10.42,b:1},{n:"Dessau",la:51.84,lo:12.25},{n:"Kassel",la:51.32,lo:9.50,b:1},{n:"Wittstock",la:53.16,lo:12.48},
+  {n:"Wittlich",la:49.99,lo:6.89},{n:"Wittenberge",la:53.01,lo:11.75},{n:"Berlin",la:52.52,lo:13.41,b:1},{n:"Dortmund",la:51.51,lo:7.47,b:1},{n:"Wismar",la:53.89,lo:11.46},
+  {n:"Hamburg",la:53.55,lo:9.99,b:1},{n:"Winsen",la:53.36,lo:10.21},{n:"Stuttgart",la:48.78,lo:9.18,b:1},{n:"M\u00f6nchengladbach",la:51.19,lo:6.44,b:1},{n:"Delmenhorst",la:53.05,lo:8.63},
+  {n:"Heidelberg",la:49.41,lo:8.69,b:1},{n:"Kreuztal",la:50.97,lo:7.99},{n:"Papenburg",la:53.08,lo:7.40},{n:"Fulda",la:50.55,lo:9.68},{n:"Wertheim",la:49.76,lo:9.51},
+  {n:"Wernigerode",la:51.84,lo:10.78},{n:"Recklinghausen",la:51.61,lo:7.20,b:1},{n:"Iserlohn",la:51.38,lo:7.70},{n:"L\u00fcdenscheid",la:51.22,lo:7.63},{n:"Potsdam",la:52.40,lo:13.07,b:1},
+  {n:"Darmstadt",la:49.87,lo:8.65,b:1},{n:"Wei\u00dfwasser",la:51.50,lo:14.64},{n:"Wei\u00dfenburg in Bayern",la:49.03,lo:10.97},{n:"Ravensburg",la:47.78,lo:9.61},{n:"Jena",la:50.93,lo:11.59,b:1},
+  {n:"Pforzheim",la:48.88,lo:8.70,b:1},{n:"Weiden",la:49.68,lo:12.16},{n:"Winschoten",la:53.14,lo:7.03},{n:"Hamburg-Nord",la:53.59,lo:9.98,b:1},{n:"Arnsberg",la:51.38,lo:8.08},
+  {n:"Warendorf",la:51.95,lo:7.99},{n:"Waren",la:53.52,lo:12.68},{n:"Oldenburg",la:53.14,lo:8.21,b:1},{n:"Warburg",la:51.49,lo:9.15},{n:"Walsrode",la:52.86,lo:9.59},
+  {n:"Osnabr\u00fcck",la:52.27,lo:8.05,b:1},{n:"Waldkraiburg",la:48.21,lo:12.40},{n:"Emmendingen",la:48.12,lo:7.85},{n:"Mannheim",la:49.49,lo:8.47,b:1},{n:"Saarlouis",la:49.31,lo:6.75},
+  {n:"Idar-Oberstein",la:49.71,lo:7.31},{n:"K\u00f6nigswinter",la:50.68,lo:7.19},{n:"Ahaus",la:52.08,lo:7.01},{n:"Saarbr\u00fccken",la:49.23,lo:7.01,b:1},{n:"Marl",la:51.66,lo:7.09},
+  {n:"Detmold",la:51.94,lo:8.87},{n:"Vilshofen",la:48.63,lo:13.19},{n:"Villingen-Schwenningen",la:48.06,lo:8.49},{n:"Bielefeld",la:52.03,lo:8.53,b:1},{n:"Achim",la:53.01,lo:9.03},
+  {n:"Essen",la:51.46,lo:7.01,b:1},{n:"Bremen",la:53.08,lo:8.81,b:1},{n:"Vechta",la:52.73,lo:8.29},{n:"Braunschweig",la:52.27,lo:10.53,b:1},{n:"Munich",la:48.14,lo:11.58,b:1},
+  {n:"Vaihingen an der Enz",la:48.94,lo:8.96},{n:"Norderstedt",la:53.70,lo:9.99},{n:"Northeim",la:51.71,lo:10.00},{n:"Germering",la:48.13,lo:11.38},{n:"Freiburg",la:48.00,lo:7.85,b:1},
+  {n:"Ulm",la:48.40,lo:9.99,b:1},{n:"Krefeld",la:51.34,lo:6.55,b:1},{n:"Uelzen",la:52.97,lo:10.56},{n:"Singen",la:47.76,lo:8.84},{n:"Tuttlingen",la:47.98,lo:8.82},
+  {n:"Reutlingen",la:48.49,lo:9.20,b:1},{n:"Bonn",la:50.73,lo:7.10,b:1},{n:"Trier",la:49.76,lo:6.64,b:1},{n:"Traunreut",la:47.96,lo:12.59},{n:"Torgau",la:51.56,lo:13.00},
+  {n:"Friedrichshafen",la:47.66,lo:9.48},{n:"Prenzlau",la:53.32,lo:13.86},{n:"Neumarkt in der Oberpfalz",la:49.28,lo:11.46},{n:"Suhl",la:50.61,lo:10.69},{n:"Strausberg",la:52.58,lo:13.89},
+  {n:"Straubing",la:48.88,lo:12.57},{n:"Stralsund",la:54.31,lo:13.08},{n:"L\u00fcbeck",la:53.87,lo:10.69,b:1},{n:"Stendal",la:52.61,lo:11.86},{n:"M\u00fcnster",la:51.96,lo:7.63,b:1},
+  {n:"Bernburg",la:51.79,lo:11.74},{n:"Minden",la:52.29,lo:8.91},{n:"Stadtallendorf",la:50.82,lo:9.01},{n:"Stade",la:53.59,lo:9.48},{n:"Staaken",la:52.54,lo:13.15},
+  {n:"Kempten (Allg\u00e4u)",la:47.73,lo:10.31},{n:"Kulmbach",la:50.10,lo:11.45},{n:"Nordhausen",la:51.50,lo:10.80},{n:"S\u00f6mmerda",la:51.16,lo:11.12},{n:"Simmerath",la:50.60,lo:6.30},
+  {n:"Albstadt",la:48.22,lo:9.03},{n:"Langenhorn",la:53.67,lo:10.02},{n:"Hoyerswerda",la:51.44,lo:14.24},{n:"Aschaffenburg",la:49.98,lo:9.15},{n:"Selb",la:50.17,lo:12.13},
+  {n:"Hannover",la:52.37,lo:9.73,b:1},{n:"Schwerin",la:53.63,lo:11.41},{n:"Schweinfurt",la:50.05,lo:10.22},{n:"Eberswalde",la:52.83,lo:13.82},{n:"Annaberg-Buchholz",la:50.58,lo:13.01},
+  {n:"Amberg",la:49.44,lo:11.86},{n:"Schw\u00e4bisch Hall",la:49.11,lo:9.74},{n:"Schw\u00e4bisch Gm\u00fcnd",la:48.80,lo:9.80},{n:"Pfaffenhofen an der Ilm",la:48.53,lo:11.51},{n:"Schramberg",la:48.22,lo:8.39},
+  {n:"Magdeburg",la:52.13,lo:11.63,b:1},{n:"Buchholz in der Nordheide",la:53.33,lo:9.87},{n:"Lennestadt",la:51.12,lo:8.07},{n:"Gotha",la:50.95,lo:10.70},{n:"Schl\u00fcchtern",la:50.35,lo:9.53},
+  {n:"Schleswig",la:54.52,lo:9.57},{n:"Halle (Saale)",la:51.48,lo:11.98,b:1},{n:"Sangerhausen",la:51.47,lo:11.30},{n:"Salzwedel",la:52.85,lo:11.15},{n:"Lippstadt",la:51.67,lo:8.34},
+  {n:"Saalfeld",la:50.65,lo:11.37},{n:"Rottenburg",la:48.48,lo:8.94},{n:"Rostock",la:54.09,lo:12.14,b:1},{n:"Rosenheim",la:47.86,lo:12.12},{n:"Riesa",la:51.31,lo:13.29},
+  {n:"Rheine",la:52.29,lo:7.44},{n:"Euskirchen",la:50.66,lo:6.79},{n:"Kiel",la:54.32,lo:10.13,b:1},{n:"Plauen",la:50.50,lo:12.14},{n:"Regensburg",la:49.02,lo:12.10,b:1},
+  {n:"Rathenow",la:52.61,lo:12.34},{n:"Baden-Baden",la:48.76,lo:8.24},{n:"Melle",la:52.20,lo:8.34},{n:"Freital",la:51.00,lo:13.65},{n:"Dresden",la:51.05,lo:13.74,b:1},
+  {n:"Aschersleben",la:51.76,lo:11.46},{n:"Eutin",la:54.14,lo:10.61},{n:"Pirna",la:50.96,lo:13.94},{n:"Pirmasens",la:49.20,lo:7.61},{n:"Passau",la:48.57,lo:13.43},
+  {n:"Parchim",la:53.43,lo:11.85},{n:"Paderborn",la:51.72,lo:8.75,b:1},{n:"Halberstadt",la:51.90,lo:11.06},{n:"Heilbronn",la:49.14,lo:9.22,b:1},{n:"Strasbourg",la:48.58,lo:7.75,b:1},
+  {n:"Hamm",la:51.68,lo:7.82,b:1},{n:"Enschede",la:52.22,lo:6.90,b:1},{n:"Freudenstadt",la:48.47,lo:8.41},{n:"N\u00f6rdlingen",la:48.85,lo:10.49},{n:"Bremerhaven",la:53.55,lo:8.58,b:1},
+  {n:"Nienburg",la:52.65,lo:9.22},{n:"Nidda",la:50.41,lo:9.01},{n:"Neuwied",la:50.43,lo:7.47},{n:"Neubrandenburg",la:53.56,lo:13.28},{n:"Neustadt in Holstein",la:54.11,lo:10.81},
+  {n:"Coburg",la:50.26,lo:10.96},{n:"Kaiserslautern",la:49.44,lo:7.77},{n:"Neustadt am R\u00fcbenberge",la:52.50,lo:9.46},{n:"Neuruppin",la:52.93,lo:12.80},{n:"Neum\u00fcnster",la:54.07,lo:9.98},
+  {n:"Neuburg an der Donau",la:48.73,lo:11.19},{n:"Naumburg",la:51.15,lo:11.81},{n:"Munster",la:52.99,lo:10.09},{n:"M\u00fchlhausen",la:51.21,lo:10.45},{n:"Burghausen",la:48.17,lo:12.83},
+  {n:"Mosbach",la:49.35,lo:9.15},{n:"Freising",la:48.40,lo:11.75},{n:"M\u00f6lln",la:53.62,lo:10.69},{n:"Chemnitz",la:50.84,lo:12.93,b:1},{n:"Michelstadt",la:49.68,lo:9.00},
+  {n:"Meppen",la:52.69,lo:7.29},{n:"Memmingen",la:47.98,lo:10.19},{n:"Mayen",la:50.33,lo:7.22},{n:"Brilon",la:51.39,lo:8.57},{n:"Kaufbeuren",la:47.88,lo:10.62},
+  {n:"Markkleeberg",la:51.28,lo:12.37},{n:"L\u00fcneburg",la:53.25,lo:10.41},{n:"Luckenwalde",la:52.09,lo:13.17},{n:"Cottbus",la:51.76,lo:14.33},{n:"Lohr am Main",la:49.99,lo:9.57},
+  {n:"G\u00f6rlitz",la:51.16,lo:14.99},{n:"Lingen",la:52.52,lo:7.32},{n:"Lilienthal",la:53.14,lo:8.90},{n:"Biberach an der Ri\u00df",la:48.09,lo:9.79},{n:"Erlangen",la:49.59,lo:11.01,b:1},
+  {n:"Landshut",la:48.53,lo:12.16},{n:"K\u00f6nigsbrunn",la:48.28,lo:10.89},{n:"Landau in der Pfalz",la:49.20,lo:8.12},{n:"Koblenz",la:50.35,lo:7.58,b:1},{n:"Bad Mergentheim",la:49.49,lo:9.77},
+  {n:"Korbach",la:51.28,lo:8.87},{n:"F\u00fcrstenwalde",la:52.36,lo:14.06},{n:"Nijmegen",la:51.84,lo:5.85,b:1},{n:"Kitzingen",la:49.74,lo:10.15},{n:"Karlstadt",la:49.96,lo:9.77},
+  {n:"Itzehoe",la:53.92,lo:9.52},{n:"Celle",la:52.62,lo:10.08},{n:"Ingolstadt",la:48.77,lo:11.42,b:1},{n:"Ilmenau",la:50.68,lo:10.92},{n:"Husum",la:54.49,lo:9.05},
+  {n:"H\u00f6xter",la:51.78,lo:9.38},{n:"Bad T\u00f6lz",la:47.76,lo:11.56},{n:"Hof",la:50.31,lo:11.91},{n:"Hildesheim",la:52.15,lo:9.95,b:1},{n:"Hameln",la:52.10,lo:9.36},
+  {n:"Herzogenaurach",la:49.57,lo:10.89},{n:"Duderstadt",la:51.51,lo:10.26},{n:"Aalen",la:48.84,lo:10.09},{n:"Heide",la:54.20,lo:9.10},{n:"Emmen",la:52.78,lo:6.91},
+  {n:"Haldensleben I",la:52.29,lo:11.41},{n:"G\u00fcstrow",la:53.80,lo:12.17},{n:"Gunzenhausen",la:49.12,lo:10.76},{n:"Eisenh\u00fcttenstadt",la:52.15,lo:14.65},{n:"Universit\u00e4ts- und Hansestadt Greifswald",la:54.09,lo:13.40},
+  {n:"Gifhorn",la:52.48,lo:10.55},{n:"Augsburg",la:48.37,lo:10.90,b:1},{n:"Gera",la:50.88,lo:12.08,b:1},{n:"Garmisch-Partenkirchen",la:47.49,lo:11.10},{n:"F\u00fcssen",la:47.57,lo:10.70},
+  {n:"Friesoythe",la:53.02,lo:7.86},{n:"Freiberg",la:50.91,lo:13.34},{n:"Frankfurt (Oder)",la:52.35,lo:14.55},{n:"Forst",la:51.74,lo:14.64},{n:"Flensburg",la:54.79,lo:9.44},
+  {n:"Finsterwalde",la:51.63,lo:13.71},{n:"Eschwege",la:51.18,lo:10.05},{n:"Erfurt",la:50.98,lo:11.03,b:1},{n:"Elmschenhagen",la:54.29,lo:10.19},{n:"Crailsheim",la:49.13,lo:10.07},
+  {n:"Eisenach",la:50.98,lo:10.32},{n:"Ehingen",la:48.28,lo:9.73},{n:"D\u00f6beln",la:51.12,lo:13.11},{n:"Dillingen an der Donau",la:48.58,lo:10.50},{n:"Diepholz",la:52.61,lo:8.37},
+  {n:"Deggendorf",la:48.84,lo:12.96},{n:"Cuxhaven",la:53.87,lo:8.70},{n:"Cloppenburg",la:52.85,lo:8.04},{n:"Clausthal-Zellerfeld",la:51.81,lo:10.34},{n:"Cham",la:49.23,lo:12.66},
+  {n:"Burg bei Magdeburg",la:52.27,lo:11.85},{n:"Brandenburg an der Havel",la:52.42,lo:12.55},{n:"Bayreuth",la:49.95,lo:11.58},{n:"Bautzen",la:51.18,lo:14.43},{n:"Baunatal",la:51.25,lo:9.41},
+  {n:"Bamberg",la:49.90,lo:10.90},{n:"Bad Kissingen",la:50.20,lo:10.08},{n:"Bad Hersfeld",la:50.87,lo:9.71},{n:"Ansbach",la:49.30,lo:10.59},{n:"Alzey",la:49.75,lo:8.12},
+  {n:"Eisleben Lutherstadt",la:51.53,lo:11.55},{n:"Wittenberg",la:51.87,lo:12.65},{n:"Kr\u00f6peliner-Tor-Vorstadt",la:54.09,lo:12.12},{n:"Vordingborg",la:55.01,lo:11.91},{n:"Copenhagen",la:55.68,lo:12.57,b:1},
+  {n:"T\u00f8nder",la:54.93,lo:8.87},{n:"Svendborg",la:55.06,lo:10.61},{n:"S\u00f8nderborg",la:54.91,lo:9.79},{n:"Slagelse",la:55.40,lo:11.35},{n:"Roskilde",la:55.64,lo:12.08},
+  {n:"Odense",la:55.40,lo:10.39,b:1},{n:"Nyk\u00f8bing Falster",la:54.77,lo:11.87},{n:"Nyborg",la:55.31,lo:10.79},{n:"Klinteby Frihed",la:55.20,lo:11.60},{n:"Kolding",la:55.49,lo:9.47},
+  {n:"Kalundborg",la:55.68,lo:11.09},{n:"Haderslev",la:55.25,lo:9.49},{n:"Esbjerg",la:55.47,lo:8.45},{n:"Mulhouse",la:47.75,lo:7.33,b:1},{n:"Nancy",la:48.68,lo:6.18,b:1},
+  {n:"Vesoul",la:47.63,lo:6.14},{n:"Verdun",la:49.16,lo:5.38},{n:"Thionville",la:49.36,lo:6.16},{n:"Colmar",la:48.08,lo:7.36},{n:"Sedan",la:49.70,lo:4.94},
+  {n:"Sarreguemines",la:49.11,lo:7.07},{n:"Saint-Dizier",la:48.64,lo:4.95},{n:"Saint-Di\u00e9-des-Vosges",la:48.28,lo:6.95},{n:"Saint-Avold",la:49.10,lo:6.70},{n:"Pontarlier",la:46.90,lo:6.36},
+  {n:"Metz",la:49.12,lo:6.17,b:1},{n:"Belfort",la:47.64,lo:6.85},{n:"Lun\u00e9ville",la:48.59,lo:6.49},{n:"Lons-le-Saunier",la:46.68,lo:5.56},{n:"Haguenau",la:48.82,lo:7.79},
+  {n:"\u00c9pinal",la:48.18,lo:6.45},{n:"Dole",la:47.09,lo:5.49},{n:"Dijon",la:47.32,lo:5.02,b:1},{n:"Chaumont",la:48.11,lo:5.14},{n:"Besan\u00e7on",la:47.25,lo:6.02,b:1},
+  {n:"Luxembourg",la:49.61,lo:6.13},{n:"Zwolle",la:52.51,lo:6.09,b:1},{n:"Arnhem",la:51.98,lo:5.91,b:1},{n:"Utrecht",la:52.09,lo:5.12,b:1},{n:"Harderwijk",la:52.34,lo:5.62},
+  {n:"Waalwijk",la:51.68,lo:5.07},{n:"Doetinchem",la:51.97,lo:6.29},{n:"Amersfoort",la:52.16,lo:5.39,b:1},{n:"'s-Hertogenbosch",la:51.70,lo:5.30,b:1},{n:"Almelo",la:52.36,lo:6.66},
+  {n:"Almere Stad",la:52.37,lo:5.21,b:1},{n:"Purmerend",la:52.51,lo:4.96},{n:"Venlo",la:51.37,lo:6.17,b:1},{n:"Eindhoven",la:51.44,lo:5.48,b:1},{n:"Lelystad",la:52.51,lo:5.47},
+  {n:"Heerenveen",la:52.96,lo:5.92},{n:"Sneek",la:53.03,lo:5.66},{n:"Apeldoorn",la:52.21,lo:5.97,b:1},{n:"Medemblik",la:52.77,lo:5.11},{n:"Leeuwarden",la:53.20,lo:5.81},
+  {n:"Drachten",la:53.11,lo:6.10},{n:"Hardenberg",la:52.58,lo:6.62},{n:"Harlingen",la:53.17,lo:5.42},{n:"Assen",la:53.00,lo:6.56},{n:"Z\u0142otoryja",la:51.13,lo:15.92},
+  {n:"Zielona G\u00f3ra",la:51.94,lo:15.51,b:1},{n:"\u017bary",la:51.64,lo:15.14},{n:"Nowa S\u00f3l",la:51.80,lo:15.72},{n:"Szczecin",la:53.43,lo:14.55,b:1},{n:"\u015awinouj\u015bcie",la:53.91,lo:14.25},
+  {n:"\u015awiebodzin",la:52.25,lo:15.53},{n:"\u015awidwin",la:53.77,lo:15.78},{n:"Stargard",la:53.34,lo:15.05},{n:"S\u0142ubice",la:52.35,lo:14.56},{n:"Gryfice",la:53.92,lo:15.20},
+  {n:"Boles\u0142awiec",la:51.26,lo:15.57},{n:"Kostrzyn nad Odr\u0105",la:52.59,lo:14.65},{n:"Ko\u0142obrzeg",la:54.18,lo:15.58},{n:"Jelenia G\u00f3ra",la:50.90,lo:15.73},{n:"Gryfino",la:53.25,lo:14.49},
+  {n:"Gorz\u00f3w Wielkopolski",la:52.74,lo:15.23,b:1},{n:"Choszczno",la:53.17,lo:15.42},{n:"Bia\u0142ogard",la:54.01,lo:15.99}
 ];
 function wolkenURL(){
   const la=[],lo=[];
@@ -1819,23 +1890,26 @@ function drawWolken(){
     const s=P(HOME_LAT,HOME_LON);
     const placed=[[s[0]-11,s[1]-11,s[0]+11,s[1]+11]];            // Standort-Pin-Bereich sperren
     const hit=r=>placed.some(p=>!(r[2]<p[0]||r[0]>p[2]||r[3]<p[1]||r[1]>p[3]));
-    const vis=[];
+    const vis=[],labRects=[];
     WOLK_CITIES.slice().sort((a,b)=>(b.b?1:0)-(a.b?1:0)).forEach(ci=>{      // Pool fuer alle Profile; Fensterfilter in der naechsten Zeile
-      const p=P(ci.la,ci.lo);if(p[0]<-4||p[0]>W+4||p[1]<-4||p[1]>H+4)return;
+      const p=P(ci.la,ci.lo);if(p[0]<4||p[0]>W-4||p[1]<4||p[1]>H-4)return;   // v1.3: nur vollstaendig sichtbare Punkte
       vis.push([ci,p]);placed.push([p[0]-4.5,p[1]-4.5,p[0]+4.5,p[1]+4.5]);});   // v1.1: ALLE Punkte zuerst sperren -> kein Label auf fremdem Punkt
     vis.forEach(([ci,p])=>{
-      x.fillStyle="rgba(255,255,255,.95)";x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fill();
       const fs=ci.b?12:11;x.font=(ci.b?"700 ":"600 ")+fs+"px -apple-system,sans-serif";
       const w=x.measureText(ci.n).width,dy=fs+2;
       const cand=[[p[0]+6,p[1]],[p[0]+6,p[1]+dy],[p[0]+6,p[1]-dy],[p[0]-6-w,p[1]],[p[0]-6-w,p[1]+dy],[p[0]-6-w,p[1]-dy]];
       let put=null;
       for(const c of cand){if(c[0]<1||c[0]+w>W-1||c[1]-fs/2<0||c[1]+fs/2>H)continue;
         const r=[c[0]-1,c[1]-fs/2-1,c[0]+w+1,c[1]+fs/2+1];if(!hit(r)){put=[c[0],c[1],r];break;}}
-      if(!put)return;                                            // kein Platz -> nur Punkt, kein Label
+      if(!put)return;                                            // v1.3: kein Platz -> Ort ganz weglassen (kein Text, kein Punkt)
+      const R=[put[2][0]-18,put[2][1]-18,put[2][2]+18,put[2][3]+18]; // 18px-Umfeld (v1.4: 12->18 gegen dichte Label-Spalten an Randpunkten)
+      let nb=0;for(const q of labRects)if(!(R[2]<q[0]||R[0]>q[2]||R[3]<q[1]||R[1]>q[3]))nb++;
+      if(nb>=2)return;                                             // v1.3: Bildraum-Trio-Sperre -> Ort ganz weglassen
+      x.fillStyle="rgba(255,255,255,.95)";x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fill();
       x.textAlign="left";x.textBaseline="middle";
       x.lineWidth=3.2;x.strokeStyle="rgba(0,0,0,.6)";x.strokeText(ci.n,put[0],put[1]);
       x.fillStyle="#fff";x.fillText(ci.n,put[0],put[1]);
-      placed.push(put[2]);});
+      placed.push(put[2]);labRects.push(put[2]);});
     x.fillStyle="rgba(232,0,11,.22)";x.beginPath();x.arc(s[0],s[1],12,0,7);x.fill();
     x.fillStyle="#e8000b";x.beginPath();x.arc(s[0],s[1],6,0,7);x.fill();
     x.lineWidth=2;x.strokeStyle="#fff";x.stroke();
