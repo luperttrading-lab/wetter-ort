@@ -290,7 +290,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v1.0</span>
+      <span class="ver">v1.1</span>
     </div>
   </header>
 
@@ -971,7 +971,7 @@ function renderPrecipToday(d){
 /* --- Kachel "Niederschlag heute": geeichte DWD-Radar-Tagessumme (RADOLAN-RW, bilinear ueber 4 Pixel am Erlental) aus radolan.json. Ueberschreibt den Open-Meteo-Fallback, sobald verfuegbar und vom heutigen Tag. --- */
 function renderRadolan(){
   if(!LOC.isWettenberg){const sec=el("umkreisSec");if(sec)sec.classList.add("hidden");return;} // Pipeline auf Wettenberg geeicht; Kachel behaelt Open-Meteo-Wert
-  fetch("radolan.json?t="+Date.now(),{cache:"no-store"})
+  fetch("https://luperttrading-lab.github.io/wetter/radolan.json?t="+Date.now(),{cache:"no-store"})   // Pipeline lebt im Repo wetter
     .then(r=>r.ok?r.json():Promise.reject("HTTP "+r.status))
     .then(j=>{
       if(!j||j.summe_mm==null){renderUmkreis(null);return;}
@@ -1375,7 +1375,15 @@ const WOLK_CITIES=[
   {n:"Friedberg",la:50.34,lo:8.76},
   {n:"Hanau",la:50.13,lo:8.92},
   {n:"Frankfurt",la:50.11,lo:8.68,b:1},
-  {n:"Wiesbaden",la:50.08,lo:8.24,b:1}
+  {n:"Wiesbaden",la:50.08,lo:8.24,b:1},
+  /* Norddeich-Region (v1.1): gemeinsamer Pool, das Kartenfenster filtert selbst */
+  {n:"Borkum",la:53.59,lo:6.66},{n:"Juist",la:53.68,lo:7.00},{n:"Norderney",la:53.71,lo:7.15},
+  {n:"Baltrum",la:53.73,lo:7.37},{n:"Langeoog",la:53.75,lo:7.48},{n:"Spiekeroog",la:53.77,lo:7.70},
+  {n:"Wangerooge",la:53.79,lo:7.90},
+  {n:"Norden",la:53.60,lo:7.20},{n:"Emden",la:53.37,lo:7.21,b:1},{n:"Aurich",la:53.47,lo:7.48},
+  {n:"Leer",la:53.23,lo:7.45},{n:"Esens",la:53.65,lo:7.61},{n:"Wittmund",la:53.58,lo:7.78},
+  {n:"Jever",la:53.57,lo:7.90},{n:"Wilhelmshaven",la:53.52,lo:8.11,b:1},
+  {n:"Delfzijl",la:53.33,lo:6.93},{n:"Groningen",la:53.22,lo:6.57,b:1}
 ];
 function wolkenURL(){
   const la=[],lo=[];
@@ -1810,8 +1818,11 @@ function drawWolken(){
     const s=P(HOME_LAT,HOME_LON);
     const placed=[[s[0]-11,s[1]-11,s[0]+11,s[1]+11]];            // Standort-Pin-Bereich sperren
     const hit=r=>placed.some(p=>!(r[2]<p[0]||r[0]>p[2]||r[3]<p[1]||r[1]>p[3]));
-    (LOC.isWettenberg?WOLK_CITIES:[]).slice().sort((a,b)=>(b.b?1:0)-(a.b?1:0)).forEach(ci=>{      // kuratierte Liste nur im Wettenberg-Profil; große Städte zuerst
+    const vis=[];
+    WOLK_CITIES.slice().sort((a,b)=>(b.b?1:0)-(a.b?1:0)).forEach(ci=>{      // Pool fuer alle Profile; Fensterfilter in der naechsten Zeile
       const p=P(ci.la,ci.lo);if(p[0]<-4||p[0]>W+4||p[1]<-4||p[1]>H+4)return;
+      vis.push([ci,p]);placed.push([p[0]-4.5,p[1]-4.5,p[0]+4.5,p[1]+4.5]);});   // v1.1: ALLE Punkte zuerst sperren -> kein Label auf fremdem Punkt
+    vis.forEach(([ci,p])=>{
       x.fillStyle="rgba(255,255,255,.95)";x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fill();
       const fs=ci.b?12:11;x.font=(ci.b?"700 ":"600 ")+fs+"px -apple-system,sans-serif";
       const w=x.measureText(ci.n).width,dy=fs+2;
