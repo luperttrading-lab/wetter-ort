@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Wolkenkarten-Kachel-Test</title>
+<style>
+html,body{margin:0;padding:0;font-family:-apple-system,sans-serif;color:#1c2a3a}
+#bg{position:fixed;inset:0;z-index:0;background:#eef2f7}
+#app{position:relative;z-index:1;max-width:430px;margin:0 auto;padding:14px}
+h1{font-size:17px;margin:4px 0 10px}
+.row{display:flex;gap:8px;margin-bottom:10px}
+button{flex:1;font-size:14.5px;font-weight:700;padding:10px 6px;border-radius:11px;border:1.5px solid #dbe3ee;background:#f2f6fb;color:#2b3b52}
+button.on{background:#2f86cf;border-color:#2f86cf;color:#fff}
+label{font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:8px}
+canvas{width:100%;border-radius:12px;display:block;background:#5c7450}
+.info{font-size:12px;color:#5c6b80;margin-top:8px;line-height:1.5}
+</style></head><body>
+<div id="bg"></div>
+<div id="app">
+<h1>Wolkenkarte: Kacheln ohne Wolken</h1>
+<div class="row"><button id="bNdd" class="on">Norddeich</button><button id="bWtb">Wettenberg</button></div>
+<label><input type="checkbox" id="cbGrid" checked> 10&times;10-Raster + Kachelzentren zeigen</label>
+<canvas id="cv"></canvas>
+<div class="info" id="info"></div>
+</div>
+<script>
+"use strict";
+/* === exakt der Code aus wetter-ort v1.0 === */
+const _merX=lon=>(lon+180)/360;
+const _merY=lat=>{const s=Math.sin(lat*Math.PI/180);return 0.5-Math.log((1+s)/(1-s))/(4*Math.PI);};
+const WOLK_TILE="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+function wolkFor(loc){
+  if(loc.isWettenberg)return {latN:51.05,latS:50.05,lonW:7.8045,lonE:9.4955,nx:10,ny:10,z:9};
+  const dLon=66/(111.32*Math.cos(loc.lat*Math.PI/180));
+  return {latN:loc.lat+0.5,latS:loc.lat-0.5,lonW:loc.lon-dLon,lonE:loc.lon+dLon,nx:10,ny:10,z:9};
+}
+/* === Profile === */
+const P_NDD={lat:53.6321080,lon:7.2141223,name:"Norddeich",isWettenberg:false};
+const P_WTB={lat:50.6481,lon:8.6743,name:"Wettenberg",isWettenberg:true};
+let cur=P_NDD,tok=0;
+const el=id=>document.getElementById(id);
+function draw(){
+  const myTok=++tok,WOLK=wolkFor(cur),cv=el("cv"),Wd=cv.clientWidth||360;
+  const dpr=Math.min(window.devicePixelRatio||1,3);
+  const z=WOLK.z,N=Math.pow(2,z)*256;
+  const wx0=_merX(WOLK.lonW)*N,wx1=_merX(WOLK.lonE)*N,wy0=_merY(WOLK.latN)*N,wy1=_merY(WOLK.latS)*N;
+  const H=Math.round(Wd*(wy1-wy0)/(wx1-wx0)),sc=Wd/(wx1-wx0);
+  cv.width=Math.round(Wd*dpr);cv.height=Math.round(H*dpr);cv.style.height=H+"px";
+  const x=cv.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);
+  const P=(la,lo)=>[(_merX(lo)*N-wx0)*sc,(_merY(la)*N-wy0)*sc];
+  const tx0=Math.floor(wx0/256),tx1=Math.floor(wx1/256),ty0=Math.floor(wy0/256),ty1=Math.floor(wy1/256);
+  const tiles=[];for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++)tiles.push([tx,ty]);
+  el("info").innerHTML=cur.name+": Fenster "+WOLK.latS.toFixed(3)+"&ndash;"+WOLK.latN.toFixed(3)+"&deg;&nbsp;N / "
+    +WOLK.lonW.toFixed(3)+"&ndash;"+WOLK.lonE.toFixed(3)+"&deg;&nbsp;O &middot; z="+z+" &middot; "
+    +tiles.length+" Satelliten-Kacheln ("+(tx1-tx0+1)+"&times;"+(ty1-ty0+1)+", x "+tx0+"&ndash;"+tx1+", y "+ty0+"&ndash;"+ty1+")";
+  let pending=tiles.length,settled=false;const bg=[];
+  const finish=()=>{if(settled||myTok!==tok)return;settled=true;
+    x.fillStyle="#5c7450";x.fillRect(0,0,Wd,H);
+    for(const t of bg)x.drawImage(t[0],(t[1]*256-wx0)*sc,(t[2]*256-wy0)*sc,256*sc,256*sc);
+    if(el("cbGrid").checked){
+      /* 10x10-Zellgrenzen + Zentren exakt wie wolkenURL: (r+0.5)/ny */
+      x.strokeStyle="rgba(255,255,255,.55)";x.lineWidth=1;
+      for(let r=0;r<=WOLK.ny;r++){const la=WOLK.latN-(WOLK.latN-WOLK.latS)*r/WOLK.ny,y=P(la,WOLK.lonW)[1];
+        x.beginPath();x.moveTo(0,y);x.lineTo(Wd,y);x.stroke();}
+      for(let c=0;c<=WOLK.nx;c++){const lo=WOLK.lonW+(WOLK.lonE-WOLK.lonW)*c/WOLK.nx,px=P(WOLK.latN,lo)[0];
+        x.beginPath();x.moveTo(px,0);x.lineTo(px,H);x.stroke();}
+      for(let r=0;r<WOLK.ny;r++)for(let c=0;c<WOLK.nx;c++){
+        const la=WOLK.latN-(WOLK.latN-WOLK.latS)*(r+0.5)/WOLK.ny,lo=WOLK.lonW+(WOLK.lonE-WOLK.lonW)*(c+0.5)/WOLK.nx,p=P(la,lo);
+        x.fillStyle="rgba(255,215,64,.95)";x.beginPath();x.arc(p[0],p[1],2.4,0,7);x.fill();}
+    }
+    const s=P(cur.lat,cur.lon);
+    x.fillStyle="rgba(232,0,11,.22)";x.beginPath();x.arc(s[0],s[1],12,0,7);x.fill();
+    x.fillStyle="#e8000b";x.beginPath();x.arc(s[0],s[1],6,0,7);x.fill();
+    x.lineWidth=2;x.strokeStyle="#fff";x.stroke();
+  };
+  if(!pending){finish();return;}
+  tiles.forEach(([tx,ty])=>{const im=new Image();
+    im.onload=()=>{bg.push([im,tx,ty]);if(--pending===0)finish();};
+    im.onerror=()=>{if(--pending===0)finish();};
+    im.src=WOLK_TILE.replace("{z}",z).replace("{y}",ty).replace("{x}",tx);});
+  setTimeout(finish,6500);
+}
+el("bNdd").onclick=()=>{cur=P_NDD;el("bNdd").classList.add("on");el("bWtb").classList.remove("on");draw();};
+el("bWtb").onclick=()=>{cur=P_WTB;el("bWtb").classList.add("on");el("bNdd").classList.remove("on");draw();};
+el("cbGrid").onchange=draw;
+window.addEventListener("resize",()=>draw());
+draw();
+</script>
+</body></html>
