@@ -278,6 +278,7 @@
 .loc-two>div{flex:1}
 .loc-hint{font-size:11.5px;color:#8a97a8;line-height:1.6;margin-top:4px}
 .loc-hint b{color:#41506a;font-size:12.5px}
+.loc-box input.loc-ok{font-weight:700;color:#14532d;border-color:#3d9a52;background:#f2faf4}
 </style>
 </head>
 <body>
@@ -294,7 +295,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.2</span>
+      <span class="ver">v2.3</span>
     </div>
   </header>
 
@@ -2233,7 +2234,7 @@ load();
   if(!LOC.isWettenberg){const pn=el("placeName");if(pn)pn.textContent=LOC.name;}
   const ov=el("locOverlay"),msg=el("locMsg"),ap=el("locApply");
   if(!ov)return;
-  const show=()=>{el("locPaste").value="";el("locPaste2").value="";el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
+  const show=()=>{el("locPaste").value="";el("locPaste2").value="";el("locPaste").classList.remove("loc-ok");el("locPaste2").classList.remove("loc-ok");el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
   const hide=()=>ov.classList.add("hidden");
   el("locBtn").onclick=show;el("locCancel").onclick=hide;
   ov.addEventListener("click",e=>{if(e.target===ov)hide();});
@@ -2259,7 +2260,8 @@ load();
     }
     if(la===null)return;
     el("locLat").value=la;el("locLon").value=lo;
-    if(fromPaste)el(id).value="";
+    el("locPaste").classList.remove("loc-ok");el("locPaste2").classList.remove("loc-ok");   // v2.3
+    if(fromPaste){el(id).classList.add("loc-ok");el(id==="locPaste"?"locPaste2":"locPaste").value="";}
     msg.textContent=(oc?"Plus Code":"Koordinaten")+" erkannt \u2013 Ortsname wird gesucht \u2026";
     autoName(la,lo);
   }
