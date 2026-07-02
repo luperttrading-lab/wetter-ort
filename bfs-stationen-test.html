@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>BfS-Stationen-Test</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,system-ui,sans-serif;color:#17202e}
+#bg{position:fixed;inset:0;z-index:0;background:#eef2f7}
+#app{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:19px;margin:4px 2px 12px}
+.card{background:#fff;border:1px solid rgba(16,24,40,.08);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.k{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8a97a8;margin-bottom:8px}
+button{font:700 13.5px -apple-system,system-ui,sans-serif;padding:9px 12px;border-radius:10px;border:1.5px solid #dbe3ee;background:#f2f6fb;color:#2b3b52;cursor:pointer;margin:0 6px 6px 0;-webkit-tap-highlight-color:transparent}
+button.on{background:#1b3a6b;border-color:#1b3a6b;color:#fff}
+button.pri{background:#2f86cf;border-color:#2f86cf;color:#fff}
+input{font-size:15px;padding:8px 10px;border:1.5px solid #dbe3ee;border-radius:9px;background:#f7fafd;width:100%;margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:left;padding:6px 4px;border-top:1px solid rgba(16,24,40,.07)}
+th{font-size:10.5px;color:#8a97a8;text-transform:uppercase;letter-spacing:.04em;border-top:0}
+tr.sel td{background:#eaf3fc}
+.msg{font-size:12.5px;color:#a05a10;line-height:1.5;min-height:16px;margin:6px 0;word-break:break-word}
+.ok{color:#14743c}.err{color:#b91c1c}
+pre{font-size:10.5px;background:#0e1a2c;color:#cfe3ff;border-radius:9px;padding:9px;overflow-x:auto;line-height:1.5;max-height:230px}
+img.tg{width:100%;border:1px solid rgba(16,24,40,.1);border-radius:9px;display:block;margin-top:6px}
+.small{font-size:11px;color:#8a97a8;line-height:1.5}
+.res-ok{color:#14743c;font-weight:700}.res-bad{color:#b91c1c;font-weight:700}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="app">
+<h1>BfS-UV-Stationen · Testseite</h1>
+
+<div class="card">
+ <div class="k">1 · Bezugspunkt</div>
+ <button class="on" id="pNdd">Norddeich</button><button id="pWtb">Wettenberg</button><button id="pFfm">Frankfurt</button>
+ <div style="display:flex;gap:8px"><input id="plat" inputmode="decimal" value="53.6321080"><input id="plon" inputmode="decimal" value="7.2141223"></div>
+</div>
+
+<div class="card">
+ <div class="k">2 · Stationsliste vom GeoServer (Layer uv_index_tagesverlauf)</div>
+ <button class="pri" id="btnList">Stationsliste laden</button>
+ <div class="msg" id="mList"></div>
+ <div id="tblWrap"></div>
+ <div class="small">Antippen einer Zeile w&auml;hlt die Station f&uuml;r Test 3 + 4.</div>
+ <pre id="rawList" style="display:none"></pre>
+</div>
+
+<div class="card">
+ <div class="k">3 · Zeitreihe der gew&auml;hlten Station (uv_index_timeseries, viewparams=kenn:&hellip;)</div>
+ <div style="margin-bottom:6px"><button class="on" id="dGest">Gestern</button><button id="dHeut">Heute</button></div>
+ <input id="extra" placeholder="Zusatz an viewparams, z. B. ;datum:2026-07-02 (leer = nur kenn)">
+ <button class="pri" id="btnTs">Zeitreihe abrufen</button>
+ <div class="msg" id="mTs"></div>
+ <pre id="rawTs" style="display:none"></pre>
+</div>
+
+<div class="card">
+ <div class="k">4 · Tagesgrafik-PNG (Produktionsweg der App)</div>
+ <button class="pri" id="btnPng">Grafik-Varianten testen</button>
+ <div class="msg" id="mPng"></div>
+ <div id="pngWrap"></div>
+</div>
+
+<div class="card">
+ <div class="k">5 · Alle Stationen durchtesten (Zeitreihe, gew&auml;hlter Tag)</div>
+ <button class="pri" id="btnAll">Alle testen</button>
+ <div class="msg" id="mAll"></div>
+ <div id="allWrap"></div>
+</div>
+
+<div class="small">GeoServer: imis.bfs.de/ogc/opendata/ows (CORS-offen) &middot; Grafiken: uvi.bfs.de/Tagesgrafiken &middot; Nachts liefern Stationen nichts (Messung Sonnenauf- bis -untergang) &rarr; Standardtag ist GESTERN.</div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const OWS="https://imis.bfs.de/ogc/opendata/ows";
+let stations=[],sel=null,dayOff=-1;
+
+/* Notliste, falls der Listen-Layer nicht antwortet (Kennungen zu verifizieren!) */
+const FALLBACK=[{kenn:"GIWE",name:"Gie\u00dfen-Wettenberg",lat:50.602,lon:8.644},
+                {kenn:"NRNY",name:"Norderney (Kennung raten!)",lat:53.71,lon:7.15},
+                {kenn:"LANG",name:"Langen (Kennung raten!)",lat:49.99,lon:8.67}];
+
+function km(a,b,c,d){const dy=(a-c)*111.32,dx=(b-d)*111.32*Math.cos((a+c)/2*Math.PI/180);return Math.hypot(dx,dy);}
+function ymdOff(off){const d=new Date();d.setDate(d.getDate()+off);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function fetchT(u,ms){return Promise.race([fetch(u).then(r=>r.ok?r.text():Promise.reject(new Error("HTTP "+r.status))),
+  new Promise((_,x)=>setTimeout(()=>x(new Error("Timeout "+(ms||12000)/1000+"s")),ms||12000))]);}
+
+/* --- 1 Bezugspunkt --- */
+const PRESETS={pNdd:[53.6321080,7.2141223],pWtb:[50.6481,8.6743],pFfm:[50.1109375,8.6821875]};
+Object.keys(PRESETS).forEach(id=>$(id).onclick=()=>{
+  ["pNdd","pWtb","pFfm"].forEach(x=>$(x).classList.toggle("on",x===id));
+  $("plat").value=PRESETS[id][0];$("plon").value=PRESETS[id][1];
+  if(stations.length)renderList();});
+
+/* --- 2 Stationsliste --- */
+function parseStations(j){
+  const out=[];
+  (j.features||[]).forEach(f=>{
+    const p=f.properties||{};
+    const kenn=p.kenn||p.KENN||p.kennung||p.station||p.id||"";
+    const name=p.name||p.NAME||p.station_name||p.ort||kenn;
+    let lat=null,lon=null;
+    if(f.geometry&&f.geometry.type==="Point"&&Array.isArray(f.geometry.coordinates)){lon=+f.geometry.coordinates[0];lat=+f.geometry.coordinates[1];}
+    if(lat==null&&p.lat!=null){lat=+p.lat;lon=+p.lon;}
+    if(kenn)out.push({kenn:String(kenn),name:String(name),lat,lon,props:p});
+  });
+  /* Ein Layer "tagesverlauf" kann pro Station viele Zeilen haben -> nach Kennung deduplizieren */
+  const seen={},ded=[];
+  out.forEach(s=>{if(!seen[s.kenn]){seen[s.kenn]=1;ded.push(s);}});
+  return ded;
+}
+function renderList(){
+  const la=parseFloat($("plat").value),lo=parseFloat($("plon").value);
+  stations.forEach(s=>s.dist=(s.lat!=null&&isFinite(la))?km(la,lo,s.lat,s.lon):null);
+  stations.sort((a,b)=>(a.dist==null?9e9:a.dist)-(b.dist==null?9e9:b.dist));
+  let h="<table><tr><th>Station</th><th>Kennung</th><th>Distanz</th></tr>";
+  stations.forEach((s,i)=>{h+=`<tr data-i="${i}"${sel===s.kenn?' class="sel"':''}><td>${s.name}</td><td>${s.kenn}</td><td>${s.dist!=null?s.dist.toFixed(0)+" km":"?"}</td></tr>`;});
+  $("tblWrap").innerHTML=h+"</table>";
+  $("tblWrap").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{
+    sel=stations[+tr.dataset.i].kenn;renderList();
+    $("mTs").textContent="Gew\u00e4hlt: "+sel;});
+}
+$("btnList").onclick=async()=>{
+  $("mList").textContent="Lade Stationsliste \u2026";$("rawList").style.display="none";
+  const url=OWS+"?service=WFS&version=2.0.0&request=GetFeature&typeNames=opendata:uv_index_tagesverlauf&outputFormat=application/json&count=500";
+  try{
+    const t=await fetchT(url,15000);let j;
+    try{j=JSON.parse(t);}catch(e){throw new Error("Antwort kein JSON \u2013 Auszug: "+t.slice(0,180));}
+    stations=parseStations(j);
+    if(!stations.length)throw new Error("0 Stationen erkannt \u2013 Schl\u00fcssel des 1. Features: "+Object.keys((j.features&&j.features[0]&&j.features[0].properties)||{}).join(", "));
+    $("mList").innerHTML='<span class="ok">'+stations.length+' Stationen geladen.</span> Feld-Schl\u00fcssel: '+Object.keys(stations[0].props).slice(0,10).join(", ");
+    $("rawList").style.display="block";$("rawList").textContent=JSON.stringify(j.features[0],null,1).slice(0,1200);
+    renderList();
+  }catch(e){
+    stations=FALLBACK.slice();sel=null;
+    $("mList").innerHTML='<span class="err">Fehler: '+e.message+'</span><br>Notliste aktiv (3 Stationen, Kennungen teils geraten).';
+    renderList();
+  }
+};
+
+/* --- 3 Zeitreihe --- */
+$("dGest").onclick=()=>{dayOff=-1;$("dGest").classList.add("on");$("dHeut").classList.remove("on");};
+$("dHeut").onclick=()=>{dayOff=0;$("dHeut").classList.add("on");$("dGest").classList.remove("on");};
+function tsUrl(kenn){
+  const vp="kenn:"+kenn+String($("extra").value||"").trim();
+  return OWS+"?service=WFS&version=2.0.0&request=GetFeature&typeNames=opendata:uv_index_timeseries&outputFormat=application/json&count=2000&viewparams="+encodeURIComponent(vp);
+}
+function tsSummary(j){
+  const f=j.features||[];
+  if(!f.length)return {n:0,txt:"0 Datens\u00e4tze"};
+  const p0=f[0].properties||{};
+  const keys=Object.keys(p0);
+  /* Zeit- und Wert-Spalte heuristisch finden */
+  const tKey=keys.find(k=>/zeit|time|datum|date/i.test(k));
+  const vKey=keys.find(k=>/uv|index|wert|value/i.test(k)&&typeof p0[k]==="number")||keys.find(k=>typeof p0[k]==="number");
+  let t0="?",t1="?",vmax=null,day=dayOff===0?ymdOff(0):ymdOff(-1),nDay=0;
+  if(tKey){const ts=f.map(x=>String((x.properties||{})[tKey]||"")).sort();t0=ts[0];t1=ts[ts.length-1];
+    nDay=ts.filter(s=>s.slice(0,10)===day).length;}
+  if(vKey)f.forEach(x=>{const v=(x.properties||{})[vKey];if(typeof v==="number"&&(vmax==null||v>vmax))vmax=v;});
+  return {n:f.length,keys,tKey,vKey,t0,t1,vmax,nDay,day,first:f[0]};
+}
+$("btnTs").onclick=async()=>{
+  if(!sel){$("mTs").textContent="Bitte erst in Tabelle 2 eine Station antippen.";return;}
+  $("mTs").textContent="Frage "+sel+" ab \u2026";$("rawTs").style.display="none";
+  try{
+    const t=await fetchT(tsUrl(sel),15000);let j;
+    try{j=JSON.parse(t);}catch(e){throw new Error("kein JSON \u2013 "+t.slice(0,180));}
+    const s=tsSummary(j);
+    if(!s.n){$("mTs").innerHTML='<span class="err">'+sel+": 0 Datens\u00e4tze.</span> N\u00e4chster Versuch: Zusatz-Parameter probieren (Feld oben).";return;}
+    $("mTs").innerHTML='<span class="ok">'+sel+": "+s.n+" Datens\u00e4tze.</span> Zeitfeld: "+(s.tKey||"?")+" \u00b7 Wertfeld: "+(s.vKey||"?")+
+      "<br>Zeitraum "+s.t0+" \u2192 "+s.t1+" \u00b7 max "+(s.vmax!=null?s.vmax:"?")+
+      "<br>Datens\u00e4tze am "+s.day+": <b>"+s.nDay+"</b>";
+    $("rawTs").style.display="block";$("rawTs").textContent=JSON.stringify(s.first,null,1).slice(0,1200);
+  }catch(e){$("mTs").innerHTML='<span class="err">Fehler: '+e.message+'</span>';}
+};
+
+/* --- 4 Tagesgrafik-PNG --- */
+function slugVariants(name){
+  const base=String(name).trim()
+    .replace(/\u00e4/g,"ae").replace(/\u00f6/g,"oe").replace(/\u00fc/g,"ue").replace(/\u00df/g,"ss")
+    .replace(/\u00c4/g,"Ae").replace(/\u00d6/g,"Oe").replace(/\u00dc/g,"Ue");
+  const v1=base.replace(/[\s\/]+/g,"-");
+  const v2=base.replace(/[\s\/]+/g,"_");
+  const v3=base.split(/[\s\/(]+/)[0];
+  return [...new Set([v1,v2,v3])];
+}
+$("btnPng").onclick=()=>{
+  if(!sel){$("mPng").textContent="Bitte erst in Tabelle 2 eine Station antippen.";return;}
+  const st=stations.find(s=>s.kenn===sel);if(!st)return;
+  const day=dayOff===0?"today":"yesterday";
+  const cands=slugVariants(st.name).map(sl=>"https://uvi.bfs.de/Tagesgrafiken/EEr_"+sl+"_"+day+".png");
+  $("mPng").textContent="Teste "+cands.length+" URL-Varianten f\u00fcr "+st.name+" ("+day+") \u2026";
+  $("pngWrap").innerHTML="";
+  let okAny=false,done=0;
+  cands.forEach(u=>{
+    const im=new Image();
+    im.onload=()=>{okAny=true;done++;
+      $("pngWrap").insertAdjacentHTML("beforeend",'<div class="small res-ok">OK: '+u+'</div>');
+      im.className="tg";$("pngWrap").appendChild(im);
+      $("mPng").innerHTML='<span class="ok">Tagesgrafik gefunden!</span>';};
+    im.onerror=()=>{done++;
+      $("pngWrap").insertAdjacentHTML("beforeend",'<div class="small res-bad">fehlt: '+u+'</div>');
+      if(done===cands.length&&!okAny)$("mPng").innerHTML='<span class="err">Keine PNG-Variante gefunden \u2013 Namensschema anders. Auf der BfS-Stationsseite nachsehen (Bild-URL kopieren) und mir schicken.</span>';};
+    im.src=u+"?ts="+Date.now();
+  });
+};
+
+/* --- 5 alle Stationen --- */
+$("btnAll").onclick=async()=>{
+  if(!stations.length){$("mAll").textContent="Bitte erst die Stationsliste laden (Schritt 2).";return;}
+  const day=dayOff===0?ymdOff(0):ymdOff(-1);
+  $("mAll").textContent="Teste "+stations.length+" Stationen (Tag "+day+"), je ~1 s \u2026";
+  let h="<table><tr><th>Kennung</th><th>Name</th><th>Datens\u00e4tze</th><th>am Tag</th><th>max</th></tr>";
+  $("allWrap").innerHTML=h+"</table>";
+  for(let i=0;i<stations.length;i++){
+    const s=stations[i];let row;
+    try{
+      const t=await fetchT(tsUrl(s.kenn),15000);
+      const j=JSON.parse(t),su=tsSummary(j);
+      row="<tr><td>"+s.kenn+"</td><td>"+s.name+"</td><td class='"+(su.n?"res-ok":"res-bad")+"'>"+su.n+"</td><td>"+su.nDay+"</td><td>"+(su.vmax!=null?su.vmax:"\u2013")+"</td></tr>";
+    }catch(e){row="<tr><td>"+s.kenn+"</td><td>"+s.name+"</td><td class='res-bad' colspan='3'>"+e.message+"</td></tr>";}
+    h+=row;$("allWrap").innerHTML=h+"</table>";
+    $("mAll").textContent="Getestet: "+(i+1)+" / "+stations.length;
+    await new Promise(r=>setTimeout(r,400));
+  }
+  $("mAll").innerHTML='<span class="ok">Fertig \u2013 '+stations.length+' Stationen getestet.</span>';
+};
+</script>
+</body>
+</html>
