@@ -290,7 +290,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v1.6</span>
+      <span class="ver">v1.7</span>
     </div>
   </header>
 
@@ -909,10 +909,31 @@ function renderAlerts(j){const box=el("alerts");box.innerHTML="";let al=(j&&j.al
   // mehrere Hitze-Warnungen -> nur die höchste Stufe behalten
   let bestHeat=null;al.forEach(a=>{if(isHeat(a)&&(!bestHeat||(rank[(a.severity||"").toLowerCase()]||0)>(rank[(bestHeat.severity||"").toLowerCase()]||0)))bestHeat=a;});
   al=al.filter(a=>!isHeat(a)||a===bestHeat);
-  al.slice().sort((a,b)=>(rank[(b.severity||"").toLowerCase()]||0)-(rank[(a.severity||"").toLowerCase()]||0)).slice(0,3).forEach(a=>{
-    let sev=(a.severity||"moderate").toLowerCase();if(!rank[sev])sev="moderate";
+  /* v1.7: gleiche Ereignisse zu einer Karte verschmelzen (Zeitfenster vereinigt, hoechste Stufe gewinnt) */
+  const groups={};
+  al.forEach(a=>{const k=String(a.event_de||a.event_en||"Wetterwarnung").trim().toUpperCase();
+    const g=groups[k];
+    if(!g){groups[k]={k,a,onset:a.onset||"",expires:a.expires||""};return;}
+    if((rank[(a.severity||"").toLowerCase()]||0)>(rank[(g.a.severity||"").toLowerCase()]||0))g.a=a;
+    if(a.onset&&(!g.onset||a.onset<g.onset))g.onset=a.onset;
+    if(a.expires&&(!g.expires||a.expires>g.expires))g.expires=a.expires;});
+  let list=Object.keys(groups).map(k=>groups[k]);
+  /* v1.7: Familien-Subsumtion Wind/Gewitter: staerkere Warnung verdeckt schwaechere bei Zeitueberlappung */
+  const fam=k=>/ORKANB\u00d6EN/.test(k)?["W",4]:/ORKANARTIGE/.test(k)?["W",3]:/SCHWERE STURMB\u00d6EN/.test(k)?["W",2.5]:/STURMB\u00d6EN/.test(k)?["W",2]:/WINDB\u00d6EN/.test(k)?["W",1]:
+             /GEWITTER/.test(k)?["G",/EXTREM/.test(k)?4:/SCHWER/.test(k)?3:/STARK/.test(k)?2:1]:null;
+  const ovl=(x,y)=>{const a0=x.onset||"0",a1=x.expires||"9999",b0=y.onset||"0",b1=y.expires||"9999";return a0<=b1&&b0<=a1;};
+  list=list.filter(x=>{const fx=fam(x.k);if(!fx)return true;
+    return !list.some(y=>{if(y===x)return false;const fy=fam(y.k);return !!fy&&fy[0]===fx[0]&&fy[1]>fx[1]&&ovl(x,y);});});
+  const fmtT=iso=>{if(!iso)return"";const d=new Date(iso);if(isNaN(d))return"";
+    return ["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()]+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+  list.sort((a,b)=>(rank[(b.a.severity||"").toLowerCase()]||0)-(rank[(a.a.severity||"").toLowerCase()]||0)).slice(0,3).forEach(g=>{
+    const a=g.a;let sev=(a.severity||"moderate").toLowerCase();if(!rank[sev])sev="moderate";
+    let sub="";const t0=fmtT(g.onset),t1=fmtT(g.expires);
+    if(t1)sub=(g.onset&&new Date(g.onset)>new Date()?t0+" \u2013 "+t1:"bis "+t1)+" Uhr";
+    else if(a.headline_de)sub=a.headline_de;
+    if(/VORAB/i.test(a.headline_de||""))sub="Vorabinformation"+(sub?" \u00b7 "+sub:"");
     const div=document.createElement("div");div.className="alert "+sev;
-    div.innerHTML=`<div class="ai">${warnIc("currentColor")}</div><div><div class="at">${a.event_de||a.event_en||"Wetterwarnung"}</div>${a.headline_de?`<div class="ad">${a.headline_de}</div>`:""}</div>`;
+    div.innerHTML=`<div class="ai">${warnIc("currentColor")}</div><div><div class="at">${a.event_de||a.event_en||"Wetterwarnung"}</div>${sub?`<div class="ad">${sub}</div>`:""}</div>`;
     box.appendChild(div);});
   if(bestHeat)el("heat").classList.remove("on");}
 
