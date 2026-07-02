@@ -37,6 +37,21 @@ function wolkFor(loc){
 /* === Profile === */
 const P_NDD={lat:53.6321080,lon:7.2141223,name:"Norddeich",isWettenberg:false};
 const P_WTB={lat:50.6481,lon:8.6743,name:"Wettenberg",isWettenberg:true};
+/* Wettenberg-Liste = Original aus der App; Norddeich = kuratierter Vorschlag (Stufe-2-Vorschau) */
+const CITIES_WTB=[
+  {n:"Biedenkopf",la:50.91,lo:8.53},{n:"Siegen",la:50.88,lo:8.02},{n:"Marburg",la:50.81,lo:8.77,b:1},
+  {n:"Alsfeld",la:50.75,lo:9.27},{n:"Herborn",la:50.68,lo:8.30},{n:"Lauterbach",la:50.64,lo:9.40},
+  {n:"Gie\u00dfen",la:50.58,lo:8.68,b:1},{n:"Weilburg",la:50.48,lo:8.26},{n:"Limburg",la:50.39,lo:8.06},
+  {n:"Friedberg",la:50.34,lo:8.76},{n:"Hanau",la:50.13,lo:8.92},{n:"Frankfurt",la:50.11,lo:8.68,b:1},
+  {n:"Wiesbaden",la:50.08,lo:8.24,b:1}];
+const CITIES_NDD=[
+  {n:"Borkum",la:53.59,lo:6.66},{n:"Juist",la:53.68,lo:7.00},{n:"Norderney",la:53.71,lo:7.15},
+  {n:"Baltrum",la:53.73,lo:7.37},{n:"Langeoog",la:53.75,lo:7.48},{n:"Spiekeroog",la:53.77,lo:7.70},
+  {n:"Wangerooge",la:53.79,lo:7.90},
+  {n:"Norden",la:53.60,lo:7.20},{n:"Emden",la:53.37,lo:7.21,b:1},{n:"Aurich",la:53.47,lo:7.48},
+  {n:"Leer",la:53.23,lo:7.45},{n:"Esens",la:53.65,lo:7.61},{n:"Wittmund",la:53.58,lo:7.78},
+  {n:"Jever",la:53.57,lo:7.90},{n:"Wilhelmshaven",la:53.52,lo:8.11,b:1},
+  {n:"Delfzijl",la:53.33,lo:6.93},{n:"Groningen",la:53.22,lo:6.57,b:1}];
 let cur=P_NDD,tok=0;
 const el=id=>document.getElementById(id);
 function draw(){
@@ -69,6 +84,27 @@ function draw(){
         x.fillStyle="rgba(255,215,64,.95)";x.beginPath();x.arc(p[0],p[1],2.4,0,7);x.fill();}
     }
     const s=P(cur.lat,cur.lon);
+    /* === Beschriftung: exakt der Platzierungs-Code aus wetter-ort v1.0 === */
+    const placed=[[s[0]-11,s[1]-11,s[0]+11,s[1]+11]];
+    const hit=r=>placed.some(p=>!(r[2]<p[0]||r[0]>p[2]||r[3]<p[1]||r[1]>p[3]));
+    const vis=[];
+    (cur.isWettenberg?CITIES_WTB:CITIES_NDD).slice().sort((a,b)=>(b.b?1:0)-(a.b?1:0)).forEach(ci=>{
+      const p=P(ci.la,ci.lo);if(p[0]<-4||p[0]>Wd+4||p[1]<-4||p[1]>H+4)return;
+      vis.push([ci,p]);
+      placed.push([p[0]-4.5,p[1]-4.5,p[0]+4.5,p[1]+4.5]);});  // ALLE Punkte zuerst sperren -> kein Label auf fremdem Punkt
+    vis.forEach(([ci,p])=>{
+      x.fillStyle="rgba(255,255,255,.95)";x.beginPath();x.arc(p[0],p[1],2.6,0,7);x.fill();
+      const fs=ci.b?12:11;x.font=(ci.b?"700 ":"600 ")+fs+"px -apple-system,sans-serif";
+      const w=x.measureText(ci.n).width,dy=fs+2;
+      const cand=[[p[0]+6,p[1]],[p[0]+6,p[1]+dy],[p[0]+6,p[1]-dy],[p[0]-6-w,p[1]],[p[0]-6-w,p[1]+dy],[p[0]-6-w,p[1]-dy]];
+      let put=null;
+      for(const c of cand){if(c[0]<1||c[0]+w>Wd-1||c[1]-fs/2<0||c[1]+fs/2>H)continue;
+        const r=[c[0]-1,c[1]-fs/2-1,c[0]+w+1,c[1]+fs/2+1];if(!hit(r)){put=[c[0],c[1],r];break;}}
+      if(!put)return;
+      x.textAlign="left";x.textBaseline="middle";
+      x.lineWidth=3.2;x.strokeStyle="rgba(0,0,0,.6)";x.strokeText(ci.n,put[0],put[1]);
+      x.fillStyle="#fff";x.fillText(ci.n,put[0],put[1]);
+      placed.push(put[2]);});
     x.fillStyle="rgba(232,0,11,.22)";x.beginPath();x.arc(s[0],s[1],12,0,7);x.fill();
     x.fillStyle="#e8000b";x.beginPath();x.arc(s[0],s[1],6,0,7);x.fill();
     x.lineWidth=2;x.strokeStyle="#fff";x.stroke();
