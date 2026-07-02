@@ -295,7 +295,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.4</span>
+      <span class="ver">v2.5</span>
     </div>
   </header>
 
@@ -1192,6 +1192,21 @@ function filterUvDay(h,off){
   const pick=a=>Array.isArray(a)?idx.map(i=>a[i]):a;
   return {time:pick(h.time),uv_index_clear_sky:pick(h.uv_index_clear_sky),uv_index:pick(h.uv_index)};
 }
+/* v2.5: BfS-Tagesgrafik fuer die naechste Messstation (Slugs live verifiziert 03.07.2026, Test-Screenshots).
+   Liste waechst, sobald weitere Slugs per bfs-stationen-test.html bestaetigt sind. Deckel 70 km: UV-Messkurven
+   enthalten die LOKALE Bewoelkung der Station - weiter weg repraesentiert sie den eigenen Himmel nicht mehr. */
+const BFS_UV_STATIONS=[
+  {slug:"Giessen-Wettenberg",name:"Gie\u00dfen-Wettenberg",la:50.602,lo:8.644},
+  {slug:"Norderney",name:"Norderney",la:53.71,lo:7.15},
+  {slug:"Langen",name:"Langen",la:49.99,lo:8.68}
+];
+function bfsNearest(){
+  let b=null,bd=1e9;
+  for(const st of BFS_UV_STATIONS){
+    const dy=(LOC.lat-st.la)*111.32,dx=(LOC.lon-st.lo)*111.32*Math.cos((LOC.lat+st.la)/2*Math.PI/180),d=Math.hypot(dx,dy);
+    if(d<bd){bd=d;b=st;}}
+  return bd<=70?{slug:b.slug,name:b.name,dist:bd}:null;
+}
 function setUvDay(off){uvDayOffset=off;if(uvAirFull)renderAirGrid(uvAirFull);}
 
 function renderAirGrid(air){
@@ -1238,7 +1253,8 @@ function renderAirGrid(air){
     if(_vd.length>=2){const vs=new Date(_vd[0]),ve=new Date(_vd[_vd.length-1]);const vmn=Math.round((ve-vs)/60000),vh=Math.floor(vmn/60),vmin=vmn%60;const f2=t=>t.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});vdLine=`<br><b style="color:#3f9b6e">Vitamin-D-Zeit ${f2(vs)}–${f2(ve)} Uhr · Dauer ${vh}h ${String(vmin).padStart(2,"0")}min</b>`;}
     const _daysw=`<div class="uvdaysw"><button class="${uvDayOffset<0?'on':''}" onclick="setUvDay(-1)">Gestern</button><button class="${uvDayOffset===0?'on':''}" onclick="setUvDay(0)">Heute</button></div>`;
     html+=`<div class="tile wide uvcard">${_daysw}<div class="uvhead"><div><div class="k">UV-Index · ${LOC.name}</div><div class="uvmax">max. möglich (klarer Himmel)<br><b>UV ${fmt1(pk)} · ${pkTime} Uhr</b></div></div><div class="uvbadge"><div class="uvb-top">UV<span>INDEX</span></div><div class="uvb-num" style="background:${bcol};color:${btxt}">${fmt1(uvN)}</div><div class="uvb-time">${nowTime}</div></div></div><canvas id="uvchart"></canvas><div class="uvleg"><span><i class="bars"></i>gemessen bis jetzt</span><span><i class="glock"></i>max. möglich</span></div><div class="uvnote">Säulenhöhe &amp; Farbe = reale UV (max. möglich × gemessene Bewölkung) bis jetzt · dicke Kurve = max. möglich bei klarem Himmel · ab UV 3 (grün) = Vitamin-D möglich${LOC.isWettenberg?' · amtliche Messung siehe unten':''}${vdLine}</div></div>`;
-    if(LOC.isWettenberg)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS Gießen-Wettenberg</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_Giessen-Wettenberg_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der BfS-Messstation Gießen-Wettenberg" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt, Station 203 m · echte Messung · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/_documents/giessen_node.html" target="_blank" rel="noopener">BfS</a></div></div>`;
+    const _bfsSt=bfsNearest();
+    if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${_bfsSt.slug}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
   }
   html+=moonTile(moonInfo(new Date()),moonPhys(new Date()));
   if(c){
