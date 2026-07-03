@@ -301,7 +301,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.13</span>
+      <span class="ver">v2.14</span>
     </div>
   </header>
 
@@ -1434,10 +1434,12 @@ function drawUV(h){
 // falls die blaue Linie minimal verschoben sitzt (X pixel-verifiziert, Y aus Screenshot vermessen):
 const BFS_X0=0.1280, BFS_X1=0.8970;  // 6 Uhr .. 21 Uhr  (Anteil der Bildbreite, pixel-vermessen)
 const BFS_Y9=0.1470, BFS_Y0=0.9110;  // UV 9 (oben) .. UV 0 (unten)  (Anteil der Bildhoehe, aus BfS-Skala-Ziffern IMG_2319 rueckgerechnet)
-function drawBfsOverlay(){
+function drawBfsOverlay(){try{
   const img=el("bfsUv"),cv=el("bfsOvl"),h=lastUVH;
   if(!img||!cv||!h||!h.uv_index_clear_sky||!h.time)return;
-  const W=img.clientWidth,Hh=img.clientHeight;if(!W||!Hh)return;
+  const W=img.clientWidth,Hh=img.clientHeight;
+  if(!W||!Hh){if((window._bfsRt=(window._bfsRt||0)+1)<=8)setTimeout(drawBfsOverlay,300);return;} // v2.14: Layout noch 0 -> bis zu 8x nachfassen
+  window._bfsRt=0;
   const dpr=Math.min(window.devicePixelRatio||1,3);
   cv.width=W*dpr;cv.height=Hh*dpr;cv.style.width=W+"px";cv.style.height=Hh+"px";
   const x=cv.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,Hh);
@@ -1461,6 +1463,7 @@ function drawBfsOverlay(){
   }
   const _ab=document.getElementById("bfsAx");
   if(_ab){_ab.textContent="Achse 0\u2013"+ax;if(!_ab._w){_ab._w=1;_ab.onclick=()=>{const st=_bfsSt;if(!st)return;const c=window._bfsAxCur||9;_axSet(st.slug,c===9?10:(c===10?12:9));syncUV();};}}
+}catch(e){const _b=document.getElementById("bfsAx");if(_b)_b.textContent="\u26a0 Overlay: "+(e&&e.message?e.message:e);}
 }
 
 
