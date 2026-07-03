@@ -295,7 +295,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.5</span>
+      <span class="ver">v2.8</span>
     </div>
   </header>
 
@@ -1196,9 +1196,49 @@ function filterUvDay(h,off){
    Liste waechst, sobald weitere Slugs per bfs-stationen-test.html bestaetigt sind. Deckel 70 km: UV-Messkurven
    enthalten die LOKALE Bewoelkung der Station - weiter weg repraesentiert sie den eigenen Himmel nicht mehr. */
 const BFS_UV_STATIONS=[
-  {slug:"Giessen-Wettenberg",name:"Gie\u00dfen-Wettenberg",la:50.602,lo:8.644},
+  {slug:"Andernach",name:"Andernach",la:50.439,lo:7.402},
+  {slug:"Berlin",name:"Berlin",la:52.447,lo:13.296},
+  {slug:"Bonn",name:"Bonn",la:50.7,lo:7.15},
+  {slug:"Chieming",name:"Chieming",la:47.888,lo:12.535},
+  {slug:"Dortmund",name:"Dortmund",la:51.514,lo:7.457},
+  {slug:"Eckernfoerde",name:"Eckernf\u00f6rde",la:54.472,lo:9.836},
+  {slug:"Fichtelberg",name:"Fichtelberg",la:50.428,lo:12.954},
+  {slug:"Friedrichshafen",name:"Friedrichshafen",la:47.674,lo:9.485},
+  {slug:"Genthin",name:"Genthin",la:52.404,lo:12.155},
+  {slug:"Giessen-Wettenberg",name:"Gie\u00dfen",la:50.602,lo:8.644},
+  {slug:"Goerlitz",name:"G\u00f6rlitz",la:51.153,lo:14.985},
+  {slug:"Groemitz",name:"Gr\u00f6mitz",la:54.15,lo:10.96},
+  {slug:"Hamburg",name:"Hamburg",la:53.55,lo:10},
+  {slug:"Hohenpeissenberg",name:"Hohenpei\u00dfenberg",la:47.801,lo:11.01},
+  {slug:"Kassel",name:"Kassel",la:51.312,lo:9.48},
+  {slug:"Klippeneck",name:"Klippeneck",la:48.108,lo:8.755},
+  {slug:"Kulmbach",name:"Kulmbach",la:50.106,lo:11.451},
+  {slug:"Langen",name:"Langen",la:49.99,lo:8.68},
+  {slug:"Lindenberg",name:"Lindenberg",la:52.209,lo:14.118},
+  {slug:"Lueneburg",name:"L\u00fcneburg",la:53.248,lo:10.408},
+  {slug:"Melpitz",name:"Melpitz",la:51.531,lo:12.928},
+  {slug:"Muenchen",name:"M\u00fcnchen",la:48.222,lo:11.597},
   {slug:"Norderney",name:"Norderney",la:53.71,lo:7.15},
-  {slug:"Langen",name:"Langen",la:49.99,lo:8.68}
+  {slug:"Salzgitter",name:"Salzgitter",la:52.152,lo:10.36},
+  {slug:"Schauinsland",name:"Schauinsland",la:47.914,lo:7.909},
+  {slug:"Stuttgart",name:"Stuttgart",la:48.783,lo:9.2},
+  {slug:"Tholey",name:"Tholey",la:49.48,lo:7.04},
+  {slug:"Todendorf",name:"Todendorf",la:54.32,lo:10.7},
+  {slug:"Waldmuenchen",name:"Waldm\u00fcnchen",la:49.378,lo:12.705},
+  {slug:"Weissenburg",name:"Wei\u00dfenburg",la:49.033,lo:10.972},
+  {slug:"Zingst",name:"Zingst",la:54.437,lo:12.69},
+  {slug:"Zirchow",name:"Zirchow",la:53.847,lo:14.15},
+  {slug:"Schneefernerhaus",name:"Zugspitze (Schneefernerhaus)",la:47.417,lo:10.979},
+  {slug:"Boesel_B",name:"Bösel",la:53.006,lo:7.958},
+  {slug:"Cuxhaven_B",name:"Cuxhaven",la:53.861,lo:8.694},
+  {slug:"Duderstadt_B",name:"Duderstadt",la:51.5075,lo:10.2386},
+  {slug:"Belm-Osnabrueck",name:"Belm-Osnabrück",la:52.3169,lo:8.1689},
+  {slug:"Sankt Augustin",name:"Sankt Augustin",la:50.78,lo:7.1819},
+  {slug:"Schweinfurt_Wasserlosen",name:"Schweinfurt (Wasserlosen)",la:50.0461,lo:10.0411},
+  {slug:"Sylt_Tinnum",name:"Sylt (Tinnum)",la:54.8922,lo:8.325},
+  {slug:"Waldhof_Falkenstein",name:"Waldhof",la:52.802,lo:10.759},
+  {slug:"Wasserkuppe bei Fulda",name:"Wasserkuppe",la:50.4969,lo:9.9431},
+  {slug:"Wurmberg_B",name:"Wurmberg (Harz)",la:51.7581,lo:10.6125}
 ];
 function bfsNearest(){
   let b=null,bd=1e9;
@@ -1254,7 +1294,7 @@ function renderAirGrid(air){
     const _daysw=`<div class="uvdaysw"><button class="${uvDayOffset<0?'on':''}" onclick="setUvDay(-1)">Gestern</button><button class="${uvDayOffset===0?'on':''}" onclick="setUvDay(0)">Heute</button></div>`;
     html+=`<div class="tile wide uvcard">${_daysw}<div class="uvhead"><div><div class="k">UV-Index · ${LOC.name}</div><div class="uvmax">max. möglich (klarer Himmel)<br><b>UV ${fmt1(pk)} · ${pkTime} Uhr</b></div></div><div class="uvbadge"><div class="uvb-top">UV<span>INDEX</span></div><div class="uvb-num" style="background:${bcol};color:${btxt}">${fmt1(uvN)}</div><div class="uvb-time">${nowTime}</div></div></div><canvas id="uvchart"></canvas><div class="uvleg"><span><i class="bars"></i>gemessen bis jetzt</span><span><i class="glock"></i>max. möglich</span></div><div class="uvnote">Säulenhöhe &amp; Farbe = reale UV (max. möglich × gemessene Bewölkung) bis jetzt · dicke Kurve = max. möglich bei klarem Himmel · ab UV 3 (grün) = Vitamin-D möglich${LOC.isWettenberg?' · amtliche Messung siehe unten':''}${vdLine}</div></div>`;
     const _bfsSt=bfsNearest();
-    if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${_bfsSt.slug}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
+    if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${encodeURIComponent(_bfsSt.slug)}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
   }
   html+=moonTile(moonInfo(new Date()),moonPhys(new Date()));
   if(c){
