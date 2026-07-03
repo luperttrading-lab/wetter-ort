@@ -306,7 +306,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.20</span>
+      <span class="ver">v2.21</span>
     </div>
   </header>
 
@@ -884,8 +884,9 @@ function uvSimSeries(t6,t21,ccAt,bellAt,cmfFn,seed,DT){ // v2.20: Sonne/Schatten
     if(cc==null||bell<=0.02){ts.push(t);vs.push(null);lo.push(null);hi.push(null);st.push(null);continue;}
     const eps=0.25*cc,cmf=cmfFn(cc*100);
     let tau=cc>0.02?(cmf-(1-cc)*(1+eps))/cc:cmf;tau=Math.max(0.12,Math.min(0.9,tau));
-    const Ts=T0*(1-cc)/Math.max(cc,0.05),Tc=T0;
-    if(rnd()<(sun?1-Math.exp(-DT/Ts):1-Math.exp(-DT/Tc)))sun=!sun;
+    const Ts=2*T0*(1-cc),Tc=2*T0*cc; // v2.21: P(Sonne)=Ts/(Ts+Tc)=(1-cc) exakt; Luecken bei hoher Bedeckung selten UND kurz
+    if(cc>=0.97)sun=false;else if(cc<=0.03)sun=true; // geschlossene Decke: keine Spitzen / klarer Himmel: keine Schatten
+    else if(rnd()<(sun?1-Math.exp(-DT/Math.max(Ts,1e4)):1-Math.exp(-DT/Math.max(Tc,1e4))))sun=!sun;
     const jit=1+(rnd()-0.5)*0.10;
     const v=bell*(sun?(1+eps*(0.6+0.8*rnd())):tau*(0.7+0.6*rnd()))*jit;
     ts.push(t);vs.push(Math.max(0,v));st.push(sun?1:0);
