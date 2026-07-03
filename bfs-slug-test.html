@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>BfS-Slug-Test · alle 43 Stationen</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,system-ui,sans-serif;color:#17202e;background:#eef2f7}
+#app{max-width:560px;margin:0 auto;padding:16px 14px 60px}
+h1{font-size:19px;margin:4px 2px 6px}
+.sub{font-size:12.5px;color:#8a97a8;line-height:1.5;margin:0 2px 14px}
+.card{background:#fff;border:1px solid rgba(16,24,40,.08);border-radius:14px;padding:12px;margin-bottom:12px}
+button{font:700 14px -apple-system,system-ui,sans-serif;padding:11px 14px;border-radius:10px;border:1.5px solid #2f86cf;background:#2f86cf;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button.sec{background:#f2f6fb;border-color:#dbe3ee;color:#2b3b52}
+.day{margin-bottom:10px}
+.day button{margin-right:6px}
+.day button.on{background:#1b3a6b;border-color:#1b3a6b;color:#fff}
+.msg{font-size:13px;color:#a05a10;margin:8px 0;min-height:18px}
+.ok{color:#14743c;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{text-align:left;padding:7px 5px;border-top:1px solid rgba(16,24,40,.07);vertical-align:top}
+th{font-size:10.5px;color:#8a97a8;text-transform:uppercase;letter-spacing:.04em;border-top:0}
+td.r{font-weight:700}
+.g{color:#14743c}.rd{color:#b91c1c}.pend{color:#c79100}
+code{font-size:11px;color:#41506a;word-break:break-all}
+.copybox{margin-top:12px;font-size:10.5px;background:#0e1a2c;color:#cfe3ff;border-radius:9px;padding:10px;white-space:pre-wrap;word-break:break-all;line-height:1.5;max-height:280px;overflow-y:auto}
+</style>
+</head>
+<body>
+<div id="app">
+<h1>BfS-Slug-Test · alle 43 Stationen</h1>
+<p class="sub">Probiert f&uuml;r jede Station automatisch mehrere URL-Schreibweisen der Tagesgrafik (Umlaut vs. ae/oe/ue, Bindestrich-Varianten). Gr&uuml;n = Grafik existiert. Am Ende steht ein fertiger Code-Block mit allen funktionierenden Slugs zum Einbau.</p>
+
+<div class="card">
+ <div class="day">Tag:
+  <button class="on" id="dToday">heute</button><button class="sec" id="dYest">gestern</button>
+ </div>
+ <button id="run">Alle 43 Stationen testen</button>
+ <div class="msg" id="msg">Bereit. Tippt auf „Alle testen“ – dauert ca. 1–2&nbsp;Minuten.</div>
+</div>
+
+<div class="card">
+ <table id="tbl"><tr><th>Station</th><th>Ergebnis</th><th>funktionierender Slug</th></tr></table>
+</div>
+
+<div class="card" id="outCard" style="display:none">
+ <div class="ok">Fertig! Diesen Block kann Neo direkt als Stationsliste einbauen:</div>
+ <div class="copybox" id="out"></div>
+</div>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const STATIONS=[
+  ["Andernach",50.439,7.402],
+  ["Berlin",52.447,13.296],
+  ["Bonn",50.700,7.150],
+  ["B\u00f6sel",52.974,7.960],
+  ["Chieming",47.888,12.535],
+  ["Cuxhaven",53.872,8.705],
+  ["Dortmund",51.514,7.457],
+  ["Duderstadt",51.513,10.259],
+  ["Eckernf\u00f6rde",54.472,9.836],
+  ["Fichtelberg",50.008,12.955],
+  ["Friedrichshafen",47.674,9.485],
+  ["Genthin",52.404,12.155],
+  ["Gie\u00dfen",50.602,8.644],
+  ["G\u00f6rlitz",51.153,14.985],
+  ["Gr\u00f6mitz",54.150,10.960],
+  ["Hamburg",53.550,10.000],
+  ["Hohenpei\u00dfenberg",47.801,11.010],
+  ["Kassel",51.312,9.480],
+  ["Klippeneck",48.108,8.755],
+  ["Kulmbach",50.106,11.451],
+  ["Langen",49.990,8.680],
+  ["Lindenberg",52.209,14.118],
+  ["L\u00fcneburg",53.248,10.408],
+  ["Melpitz",51.531,12.928],
+  ["M\u00fcnchen",48.222,11.597],
+  ["Norderney",53.710,7.150],
+  ["Osnabr\u00fcck",52.271,8.046],
+  ["Salzgitter",52.152,10.360],
+  ["Sankt Augustin",50.770,7.183],
+  ["Schauinsland",47.914,7.909],
+  ["Schweinfurt",50.049,10.234],
+  ["Stuttgart",48.783,9.200],
+  ["Sylt",54.908,8.307],
+  ["Tholey",49.480,7.040],
+  ["Todendorf",54.320,10.700],
+  ["Waldhof",52.802,10.759],
+  ["Waldm\u00fcnchen",49.378,12.705],
+  ["Wasserkuppe",50.498,9.943],
+  ["Wei\u00dfenburg",49.033,10.972],
+  ["Wurmberg",51.760,10.618],
+  ["Zingst",54.437,12.690],
+  ["Zirchow",53.847,14.150],
+  ["Zugspitze",47.421,10.986]
+];
+let day="today";
+$("dToday").onclick=()=>{day="today";$("dToday").classList.add("on");$("dYest").classList.remove("on");};
+$("dYest").onclick=()=>{day="yesterday";$("dYest").classList.add("on");$("dToday").classList.remove("on");};
+
+/* Slug-Varianten fuer einen Stationsnamen erzeugen (Reihenfolge = Prioritaet) */
+function variants(name){
+  const ae=name.replace(/\u00e4/g,"ae").replace(/\u00f6/g,"oe").replace(/\u00fc/g,"ue").replace(/\u00df/g,"ss")
+               .replace(/\u00c4/g,"Ae").replace(/\u00d6/g,"Oe").replace(/\u00dc/g,"Ue");
+  const raw=name; // mit Umlaut
+  const set=[];
+  const push=v=>{if(v&&set.indexOf(v)<0)set.push(v);};
+  // transkribiert (wie Giessen) - Bindestrich, dann Unterstrich, dann erstes Wort
+  [ae,raw].forEach(base=>{
+    push(base.replace(/[\s\/]+/g,"-"));
+    push(base.replace(/[\s\/]+/g,"_"));
+    push(base.split(/[\s\/(]+/)[0]);
+  });
+  return set;
+}
+function testUrl(url){
+  return new Promise(res=>{
+    const im=new Image();
+    let done=false;const fin=ok=>{if(!done){done=true;res(ok);}};
+    im.onload=()=>fin(im.naturalWidth>50); // echte Grafik, nicht 1px-Fehlerbild
+    im.onerror=()=>fin(false);
+    setTimeout(()=>fin(false),8000);
+    im.src=url+"?ts="+Date.now();
+  });
+}
+async function findSlug(name){
+  for(const v of variants(name)){
+    const url="https://uvi.bfs.de/Tagesgrafiken/EEr_"+v+"_"+day+".png";
+    if(await testUrl(url))return v;
+  }
+  return null;
+}
+$("run").onclick=async()=>{
+  $("run").disabled=true;$("outCard").style.display="none";
+  const tbl=$("tbl");tbl.innerHTML="<tr><th>Station</th><th>Ergebnis</th><th>funktionierender Slug</th></tr>";
+  const rows={},found=[];
+  STATIONS.forEach(([name,la,lo])=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML="<td>"+name+"</td><td class='r pend'>… teste …</td><td></td>";
+    tbl.appendChild(tr);rows[name]=tr;
+  });
+  for(let i=0;i<STATIONS.length;i++){
+    const [name,la,lo]=STATIONS[i];
+    $("msg").textContent="Teste "+(i+1)+" / "+STATIONS.length+": "+name+" …";
+    const slug=await findSlug(name);
+    const tr=rows[name];
+    if(slug){tr.children[1].className="r g";tr.children[1].textContent="✓ gefunden";
+      tr.children[2].innerHTML="<code>"+slug+"</code>";
+      found.push([name,la,lo,slug]);}
+    else{tr.children[1].className="r rd";tr.children[1].textContent="✗ kein Slug";
+      tr.children[2].innerHTML="<code>–</code>";}
+  }
+  $("msg").innerHTML='<span class="ok">Fertig – '+found.length+' von '+STATIONS.length+' Stationen haben eine '+(day==="today"?"heute":"gestern")+'-Grafik.</span>';
+  // Code-Block bauen
+  let js="const BFS_UV_STATIONS=[\n";
+  found.forEach(([name,la,lo,slug])=>{
+    js+='  {slug:"'+slug+'",name:"'+name+'",la:'+la+',lo:'+lo+'},\n';
+  });
+  js+="];";
+  $("out").textContent=js;$("outCard").style.display="block";
+  $("run").disabled=false;
+};
+</script>
+</body>
+</html>
