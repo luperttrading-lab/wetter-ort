@@ -219,6 +219,7 @@
   .uvleg i{display:inline-block;vertical-align:middle;margin-right:5px}
   .uvleg i.bars{width:12px;height:11px;border-radius:2px;background:linear-gradient(0deg,#46a13a,#f5d800,#f15a16,#c41f3e)}
   .uvleg i.glock{width:15px;height:0;border-top:3px solid #3a4453;border-radius:2px}
+  .uvleg i.physl{width:15px;height:0;border-top:1.6px solid #7f8b9c;border-radius:2px}
   .uvnote{font-size:9.5px;color:var(--faint);text-align:center;margin-top:3px;line-height:1.3}
   #wolkenCv{width:100%;display:block;border-radius:12px;background:#5c7450}
   .bfscard{padding:13px 14px 9px}
@@ -279,6 +280,8 @@
 .loc-hint{font-size:11.5px;color:#8a97a8;line-height:1.6;margin-top:4px}
 .loc-hint b{color:#41506a;font-size:12.5px}
 .loc-box input.loc-ok{font-weight:700;color:#14532d;border-color:#3d9a52;background:#f2faf4}
+.loc-hit{padding:10px 12px;margin-top:7px;border:1px solid #c8d2e0;border-radius:9px;font-size:13.5px;background:#fff;cursor:pointer;line-height:1.35}
+.loc-hit:active{transform:scale(.98)}
 </style>
 </head>
 <body>
@@ -295,7 +298,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.8</span>
+      <span class="ver">v2.10</span>
     </div>
   </header>
 
@@ -350,7 +353,10 @@
 <div id="locOverlay" class="loc-ovl hidden" role="dialog" aria-label="Standort einstellen">
   <div class="loc-box">
     <div class="loc-h">Standort</div>
-    <label for="locPaste">GPS aus Google&nbsp;Maps einf&uuml;gen</label><input id="locPaste" type="text" autocomplete="off" placeholder="(50.1109375, 8.6821875)">
+    <label for="locFind">Ortsname suchen</label>
+    <div class="loc-two"><div><input id="locFind" type="text" autocomplete="off" placeholder="z.&nbsp;B. M&uuml;nchen"></div><button type="button" id="locFindBtn" class="loc-btn" style="flex:0 0 auto">Suchen</button></div>
+    <div id="locFindRes"></div>
+    <label for="locPaste" style="margin-top:10px;display:block">GPS aus Google&nbsp;Maps einf&uuml;gen</label><input id="locPaste" type="text" autocomplete="off" placeholder="(50.1109375, 8.6821875)">
     <input id="locPaste2" type="text" autocomplete="off" placeholder="9F2C4M6J+9V" style="margin-top:8px" aria-label="Plus Code aus Google Maps einf&uuml;gen">
     <div class="loc-hint">Koordinaten oben oder Plus&nbsp;Code darunter einf&uuml;gen &ndash; Breitengrad, L&auml;ngengrad und Ortsname f&uuml;llen sich automatisch.</div>
     <div class="loc-two">
@@ -857,6 +863,8 @@ function bfsBadgeCol(u){if(u==null)return["#9aa7b8","#fff"];const k=Math.max(0,M
 // mu = sin(Sonnenhoehe) = cos(Zenitwinkel); UV(klar) ~ A*mu^k. k per log-Regression an die Open-Meteo-
 // Stuetzpunkte gefittet, A so skaliert, dass der Scheitel exakt das Open-Meteo-Tagesmaximum trifft.
 function _sunMu(ms){const S=window.satellite;if(!S)return null;const d=new Date(ms),jd=S.jday(d),sp=S.sunPos(jd),gm=S.gstime(d),Hh=gm+LON*Math.PI/180-sp.rtasc,phi=LAT*Math.PI/180;return Math.sin(phi)*Math.sin(sp.decl)+Math.cos(phi)*Math.cos(sp.decl)*Math.cos(Hh);}
+const _O3M=[340,360,375,370,355,340,325,310,295,285,295,315]; // Monats-Ozonklimatologie Mitteleuropa (DU), TEMIS-orientiert
+function physUvAt(ms){const mu=_sunMu(ms);if(mu==null||mu<=0)return 0;return 12.5*Math.pow(mu,2.42)*Math.pow(300/_O3M[new Date(ms).getMonth()],1.23);} // Allaart 2004: Klarhimmel-UVI
 function makeSunBell(cs,tms,t6,t21,fallback){
   if(!window.satellite)return fallback;
   let i0=-1,i1=-1;for(let i=0;i<cs.length;i++){if((cs[i]||0)>0.05){if(i0<0)i0=i;i1=i;}}
@@ -1292,7 +1300,7 @@ function renderAirGrid(air){
     let vdLine="";
     if(_vd.length>=2){const vs=new Date(_vd[0]),ve=new Date(_vd[_vd.length-1]);const vmn=Math.round((ve-vs)/60000),vh=Math.floor(vmn/60),vmin=vmn%60;const f2=t=>t.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});vdLine=`<br><b style="color:#3f9b6e">Vitamin-D-Zeit ${f2(vs)}–${f2(ve)} Uhr · Dauer ${vh}h ${String(vmin).padStart(2,"0")}min</b>`;}
     const _daysw=`<div class="uvdaysw"><button class="${uvDayOffset<0?'on':''}" onclick="setUvDay(-1)">Gestern</button><button class="${uvDayOffset===0?'on':''}" onclick="setUvDay(0)">Heute</button></div>`;
-    html+=`<div class="tile wide uvcard">${_daysw}<div class="uvhead"><div><div class="k">UV-Index · ${LOC.name}</div><div class="uvmax">max. möglich (klarer Himmel)<br><b>UV ${fmt1(pk)} · ${pkTime} Uhr</b></div></div><div class="uvbadge"><div class="uvb-top">UV<span>INDEX</span></div><div class="uvb-num" style="background:${bcol};color:${btxt}">${fmt1(uvN)}</div><div class="uvb-time">${nowTime}</div></div></div><canvas id="uvchart"></canvas><div class="uvleg"><span><i class="bars"></i>gemessen bis jetzt</span><span><i class="glock"></i>max. möglich</span></div><div class="uvnote">Säulenhöhe &amp; Farbe = reale UV (max. möglich × gemessene Bewölkung) bis jetzt · dicke Kurve = max. möglich bei klarem Himmel · ab UV 3 (grün) = Vitamin-D möglich${LOC.isWettenberg?' · amtliche Messung siehe unten':''}${vdLine}</div></div>`;
+    html+=`<div class="tile wide uvcard">${_daysw}<div class="uvhead"><div><div class="k">UV-Index · ${LOC.name}</div><div class="uvmax">max. möglich (klarer Himmel)<br><b>UV ${fmt1(pk)} · ${pkTime} Uhr</b></div></div><div class="uvbadge"><div class="uvb-top">UV<span>INDEX</span></div><div class="uvb-num" style="background:${bcol};color:${btxt}">${fmt1(uvN)}</div><div class="uvb-time">${nowTime}</div></div></div><canvas id="uvchart"></canvas><div class="uvleg"><span><i class="bars"></i>gemessen bis jetzt</span><span><i class="glock"></i>max. möglich</span><span><i class="physl"></i>phys. Referenz</span></div><div class="uvnote">Säulenhöhe &amp; Farbe = reale UV (max. möglich × gemessene Bewölkung) bis jetzt · dicke Kurve = max. möglich bei klarem Himmel · dünne graue Kurve = phys. Klarsky-Referenz (Allaart: 12,5·μ^2,42·(300/O₃)^1,23) · ab UV 3 (grün) = Vitamin-D möglich${LOC.isWettenberg?' · amtliche Messung siehe unten':''}${vdLine}</div></div>`;
     const _bfsSt=bfsNearest();
     if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${encodeURIComponent(_bfsSt.slug)}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
   }
@@ -1386,6 +1394,11 @@ function drawUV(h){
   // Physikalische Klarhimmel-Glocke (global definiert); csBell = Fallback ohne satellite-Lib
   const sunBell=makeSunBell(cs,tms,t6,t21,csBell);
   const pxA=gx0,pxB=gx1;
+  if(window.satellite){ // v2.10: physikalische Klarsky-Referenz (Allaart) als duenne graue Linie
+    x.lineJoin="round";x.lineCap="round";x.lineWidth=1.6;x.strokeStyle="rgba(127,139,156,.95)";x.beginPath();let _pf=true;
+    for(let px=pxA;px<=pxB;px+=1){const t=t6+((px-gx0)/(gx1-gx0))*(t21-t6);const uv=Math.min(physUvAt(t),axMax);if(_pf){x.moveTo(px,Y(uv));_pf=false;}else x.lineTo(px,Y(uv));}
+    x.stroke();
+  }
   x.lineJoin="round";x.lineCap="round";x.lineWidth=3;x.strokeStyle="#3a4453";x.beginPath();let _gf=true;
   for(let px=pxA;px<=pxB;px+=1){const t=t6+((px-gx0)/(gx1-gx0))*(t21-t6);const uv=sunBell(t);if(_gf){x.moveTo(px,Y(uv));_gf=false;}else x.lineTo(px,Y(uv));}x.stroke();
   // stuendliche REALE Messwerte als Vorwaerts-Treppe: Messpunkt = linke Ecke, dann 1h nach rechts, dann Sprung zum naechsten.
@@ -2290,7 +2303,7 @@ load();
   if(!LOC.isWettenberg){const pn=el("placeName");if(pn)pn.textContent=LOC.name;}
   const ov=el("locOverlay"),msg=el("locMsg"),ap=el("locApply");
   if(!ov)return;
-  const show=()=>{el("locPaste").value="";el("locPaste2").value="";el("locPaste").classList.remove("loc-ok");el("locPaste2").classList.remove("loc-ok");el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
+  const show=()=>{el("locPaste").value="";el("locPaste2").value="";el("locFind").value="";el("locFind").classList.remove("loc-ok");el("locFindRes").innerHTML="";el("locPaste").classList.remove("loc-ok");el("locPaste2").classList.remove("loc-ok");el("locLat").value=LOC.lat;el("locLon").value=LOC.lon;el("locName").value=LOC.isWettenberg?"":LOC.name;msg.textContent="";delete ap.dataset.warned;ov.classList.remove("hidden");};
   const hide=()=>ov.classList.add("hidden");
   el("locBtn").onclick=show;el("locCancel").onclick=hide;
   ov.addEventListener("click",e=>{if(e.target===ov)hide();});
@@ -2356,6 +2369,43 @@ load();
       if(done)done(n);
     });
   }
+  let _nsTok=0;                                   // v2.9: Ortssuche via Nominatim (vorwaerts), Token gegen veraltete Antworten
+  function nameSearch(){
+    const q=String(el("locFind").value).trim();
+    if(q.length<2){msg.textContent="Bitte einen Ortsnamen mit mindestens 2 Zeichen eingeben.";return;}
+    const tok=++_nsTok,box=el("locFindRes");
+    box.innerHTML="";msg.textContent="Suche \u201e"+q+"\u201c \u2026";
+    const to=new Promise(res=>setTimeout(()=>res(null),9000));
+    Promise.race([
+      fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&accept-language=de&q="+encodeURIComponent(q))
+        .then(r=>r.ok?r.json():null).catch(()=>null),
+      to
+    ]).then(j=>{
+      if(tok!==_nsTok)return;
+      if(!j||!j.length){msg.textContent="Kein Ort gefunden \u2013 anders schreiben oder Region erg\u00e4nzen (z.\u202fB. \u201eNeustadt Holstein\u201c).";return;}
+      const seen={},hits=[];
+      for(const r of j){const k=(+r.lat).toFixed(2)+"/"+(+r.lon).toFixed(2);if(!seen[k]){seen[k]=1;hits.push(r);}}
+      const pick=r=>{
+        const a=r.address||{};
+        const n=_locSan(a.village||a.town||a.city||a.municipality||a.county||String(r.display_name||"").split(",")[0]).trim();
+        el("locLat").value=(+r.lat).toFixed(5);el("locLon").value=(+r.lon).toFixed(5);
+        el("locName").value=n;
+        el("locPaste").value="";el("locPaste2").value="";
+        el("locPaste").classList.remove("loc-ok");el("locPaste2").classList.remove("loc-ok");
+        el("locFind").classList.add("loc-ok");
+        box.innerHTML="";delete ap.dataset.warned;
+        msg.textContent="Ort: "+n+" \u00b7 Quelle OpenStreetMap \u2013 jetzt \u201e\u00dcbernehmen\u201c tippen.";
+      };
+      if(hits.length===1){pick(hits[0]);return;}
+      msg.textContent=hits.length+" Treffer \u2013 bitte antippen:";
+      hits.forEach(r=>{const d=document.createElement("div");d.className="loc-hit";
+        d.textContent=String(r.display_name||"").split(",").slice(0,3).join(",");
+        d.onclick=()=>pick(r);box.appendChild(d);});
+    });
+  }
+  el("locFindBtn").onclick=nameSearch;
+  el("locFind").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();nameSearch();}});
+  el("locFind").addEventListener("input",()=>{el("locFind").classList.remove("loc-ok");});
   el("locGps").onclick=()=>{
     if(!navigator.geolocation){msg.textContent="GPS ist auf diesem Ger\u00e4t nicht verf\u00fcgbar \u2013 Koordinaten bitte manuell eingeben.";return;}
     msg.textContent="GPS wird abgefragt \u2026";
