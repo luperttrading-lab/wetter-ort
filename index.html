@@ -301,7 +301,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.11</span>
+      <span class="ver">v2.12</span>
     </div>
   </header>
 
@@ -1305,7 +1305,7 @@ function renderAirGrid(air){
     const _daysw=`<div class="uvdaysw"><button class="${uvDayOffset<0?'on':''}" onclick="setUvDay(-1)">Gestern</button><button class="${uvDayOffset===0?'on':''}" onclick="setUvDay(0)">Heute</button></div>`;
     html+=`<div class="tile wide uvcard">${_daysw}<div class="uvhead"><div><div class="k">UV-Index · ${LOC.name}</div><div class="uvmax">max. möglich (klarer Himmel)<br><b>UV ${fmt1(pk)} · ${pkTime} Uhr</b></div></div><div class="uvbadge"><div class="uvb-top">UV<span>INDEX</span></div><div class="uvb-num" style="background:${bcol};color:${btxt}">${fmt1(uvN)}</div><div class="uvb-time">${nowTime}</div></div></div><canvas id="uvchart"></canvas><div class="uvleg"><span><i class="bars"></i>gemessen bis jetzt</span><span><i class="glock"></i>max. möglich</span><span><i class="physl"></i>phys. Referenz</span></div><div class="uvnote">Säulenhöhe &amp; Farbe = reale UV (max. möglich × gemessene Bewölkung) bis jetzt · dicke Kurve = max. möglich bei klarem Himmel · dünne graue Kurve = phys. Klarsky-Referenz (Allaart: 12,5·μ^2,42·(300/O₃)^1,23) · ab UV 3 (grün) = Vitamin-D möglich${LOC.isWettenberg?' · amtliche Messung siehe unten':''}${vdLine}</div></div>`;
     const _bfsSt=bfsNearest();
-    if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${encodeURIComponent(_bfsSt.slug)}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#1b3a6b">blaue Linie</b> = max. möglich (Klarsky-Modell) · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
+    if(_bfsSt)html+=`<div class="tile wide bfscard" id="bfsCard"><div class="k">Amtlich gemessen · BfS ${_bfsSt.name}${_bfsSt.dist>2?" · "+_bfsSt.dist.toFixed(0)+" km":""}</div><div class="bfswrap"><img id="bfsUv" src="https://uvi.bfs.de/Tagesgrafiken/EEr_${encodeURIComponent(_bfsSt.slug)}_${uvDayOffset===0?'today':'yesterday'}.png?ts=${_bfsTs}" alt="UV-Index-Tagesverlauf der n\u00e4chsten BfS-Messstation" onload="var f=document.getElementById('bfsFb');if(f)f.style.display='none';if(window.syncUV)syncUV();else if(window.drawBfsOverlay)drawBfsOverlay()" onerror="this.style.display='none';var f=document.getElementById('bfsFb');if(f)f.style.display='block'"><canvas id="bfsOvl" class="bfsovl"></canvas><div class="bfsfb" id="bfsFb">Amtliche BfS-Messgrafik – lädt nur auf der veröffentlichten Seite (online), nicht in der App-Vorschau.</div></div><div class="uvnote">Breitbandradiometer, 1-Minuten-Takt · echte Messung an der Station · <b style="color:#8a8f98">graue Linie</b> = Clear-Sky-Prognose des DWD · Quelle: <a href="https://www.bfs.de/DE/themen/opt/uv/uv-index/aktuelle-tagesverlaeufe/aktuelle-tagesverlaeufe.html" target="_blank" rel="noopener">BfS</a></div></div>`;
   }
   html+=moonTile(moonInfo(new Date()),moonPhys(new Date()));
   if(c){
@@ -1439,6 +1439,7 @@ function drawBfsOverlay(){
   const dpr=Math.min(window.devicePixelRatio||1,3);
   cv.width=W*dpr;cv.height=Hh*dpr;cv.style.width=W+"px";cv.style.height=Hh+"px";
   const x=cv.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,Hh);
+  return; // v2.12: Eigenkurve entfernt - BfS-Achse variiert je Station (Giessen 0..9, Muenchen 0..10); ohne Pixel-Zugriff (CORS) keine Kalibrierung moeglich. DWD-Klarsky ist Teil der Grafik.
   const cs=h.uv_index_clear_sky,tms=h.time.map(t=>new Date(t).getTime());
   const day=new Date(tms[0]);day.setHours(0,0,0,0);
   const t6=day.getTime()+6*3600e3,t21=day.getTime()+21*3600e3;
