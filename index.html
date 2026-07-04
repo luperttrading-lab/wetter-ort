@@ -222,6 +222,9 @@
   .uvsimrow{text-align:center;margin-top:7px}
   .uvsimbtn{font-size:11.5px;padding:5px 13px;border-radius:999px;border:1px solid #c8d2e0;background:#fff;color:#3a4453;cursor:pointer}
   .uvsimbtn.on{background:#7a4dd8;border-color:#7a4dd8;color:#fff}
+  #metSec .met-box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;font-size:14px;line-height:1.55;color:#1c2a3a}
+  .met-amp{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12.5px;background:#eef1f6;color:#3a4453}
+  .met-amp.ok{background:#eaf7ec;color:#14532d}.met-amp.mid{background:#fff4e0;color:#8a5b00}.met-amp.bad{background:#fdeaea;color:#8a1f1f}
   .wolkctl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;align-items:center;margin-top:10px;font-size:12.5px;color:#5b6879}
   .wolkctl input[type=range]{width:100%;accent-color:#1c66c4}
   .wolkctl b{font-variant-numeric:tabular-nums}
@@ -306,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.25</span>
+      <span class="ver">v2.26</span>
     </div>
   </header>
 
@@ -346,6 +349,7 @@
     <div id="airSec" class="hidden"><div class="sect">UV &amp; Mond</div><div class="grid" id="gridAir"></div></div>
     <div id="planetenSec" class="hidden"><div class="sect">Planeten am Himmel</div><div class="nowcard pl-card"><div class="pl-wrap"><canvas id="planetenCv"></canvas><div id="plDWheel" class="pl-wheel pl-dwheel"><div class="pw-a" id="pdPrev"></div><div class="pw-b" id="pdCur"></div><div class="pw-a" id="pdNext"></div></div><div id="plWheel" class="pl-wheel"><div class="pw-a" id="pwPrev"></div><div class="pw-b" id="pwCur"></div><div class="pw-a" id="pwNext"></div></div><button id="plNow" class="pl-now">Jetzt</button><canvas id="planetenSunCv"></canvas></div><div id="planetenLeg" class="pl-leg"></div><div class="pl-note">Planeten erscheinen nach Helligkeit in der D&auml;mmerung &middot; Mond ganzt&auml;gig</div></div></div>
     <div id="issSec" class="hidden"><div class="sect">ISS-Überflüge</div><div id="issMain"></div><div id="issList"></div></div>
+    <div id="metSec" class="hidden"><div class="sect">Meteorströme</div><div id="metBody"></div></div>
   </div>
 
   <div class="state" id="stLoading"><div class="spinner"></div><p>Messwerte werden geladen …</p></div>
@@ -2180,7 +2184,7 @@ function loadExtras(){
   try{renderAirGrid(null);}catch(e){console.warn("airgrid",e);}   // Mond sofort, Rest folgt
   try{renderPlaneten();}catch(e){console.warn("planeten",e);}     // rein berechnet, kein Fetch
   const ll=`latitude=${LAT}&longitude=${LON}`;
-  fetchJSON(`https://api.open-meteo.com/v1/forecast?${ll}&hourly=precipitation,precipitation_probability,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high&forecast_days=2&timezone=Europe%2FBerlin`).then(d=>{_rainHrHad=true;window._ccLayers=(d&&d.hourly&&d.hourly.cloud_cover_low)?d.hourly:window._ccLayers;if(window._uvSimOn&&typeof syncUV==="function")syncUV();renderRainHours(d);renderPrecipToday(d);}).catch(e=>{if(!_rainHrHad)el("rainHrSec").classList.add("hidden");console.warn("rainhr",e.message);});
+  fetchJSON(`https://api.open-meteo.com/v1/forecast?${ll}&hourly=precipitation,precipitation_probability,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high&forecast_days=2&timezone=Europe%2FBerlin`).then(d=>{_rainHrHad=true;window._ccLayers=(d&&d.hourly&&d.hourly.cloud_cover_low)?d.hourly:window._ccLayers;if(window._uvSimOn&&typeof syncUV==="function")syncUV();if(typeof renderMeteors==="function")renderMeteors();renderRainHours(d);renderPrecipToday(d);}).catch(e=>{if(!_rainHrHad)el("rainHrSec").classList.add("hidden");console.warn("rainhr",e.message);});
   renderRadolan(); // genauere DWD-Radar-Tagessumme; ueberschreibt den Open-Meteo-Wert oben, sobald da
   loadCached("wolkCache3"+LOC_KEY,wolkenURL(),30*60e3,6*3600e3,renderWolken,"wolkenSec","Wolkenkarte");
   fetchJSON(`https://air-quality-api.open-meteo.com/v1/air-quality?${ll}&current=uv_index,european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,grass_pollen,birch_pollen,alder_pollen,mugwort_pollen,ragweed_pollen&hourly=uv_index,uv_index_clear_sky&past_days=1&forecast_days=1&timezone=Europe%2FBerlin`).then(renderAirGrid).catch(e=>console.warn("air",e.message));
@@ -2209,6 +2213,60 @@ function DEMO_EXTRAS(){
   renderForecast({daily:{time:days,weather_code:[0,1,2,80,95,2,1,3,61,80,2,1,0,2,3,61],temperature_2m_max:[38,37,33,27,24,28,30,29,25,24,27,29,31,30,28,26],temperature_2m_min:[21,22,20,18,16,16,17,18,17,16,16,17,18,18,17,16],precipitation_probability_max:[0,5,25,70,80,20,10,30,60,70,20,10,5,15,25,55],precipitation_sum:[0,0,0.4,6.2,14.5,1.1,0,2.3,8.0,12.0,0.8,0,0,0.6,2.1,9.4]}});
 }
 
+/* ===== Meteorstroeme (v2.26) ===== */
+const METEORS=[ // n, Aktivitaet a-b [Monat,Tag], Peak p (Nacht p -> p+1), ZHR z, Radiant ra(h)/de(Grad), v km/s
+ {n:"Quadrantiden",a:[1,1],b:[1,10],p:[1,3],z:110,ra:15.3,de:49,v:41},
+ {n:"Lyriden",a:[4,16],b:[4,25],p:[4,22],z:18,ra:18.1,de:34,v:49},
+ {n:"Eta-Aquariiden",a:[4,19],b:[5,28],p:[5,5],z:50,ra:22.5,de:-1,v:66},
+ {n:"Perseiden",a:[7,17],b:[8,24],p:[8,12],z:100,ra:3.1,de:58,v:59},
+ {n:"Orioniden",a:[10,2],b:[11,7],p:[10,21],z:20,ra:6.3,de:16,v:66},
+ {n:"Leoniden",a:[11,6],b:[11,30],p:[11,17],z:15,ra:10.1,de:22,v:71},
+ {n:"Geminiden",a:[12,4],b:[12,17],p:[12,13],z:150,ra:7.5,de:33,v:35},
+ {n:"Ursiden",a:[12,17],b:[12,26],p:[12,22],z:10,ra:14.5,de:76,v:33}
+];
+function meteorPick(d){const y=d.getFullYear(),t=new Date(y,d.getMonth(),d.getDate()).getTime();
+  const mk=(mm,dd,yy)=>new Date(yy,mm-1,dd).getTime();let act=null;
+  for(const m of METEORS){const A=mk(m.a[0],m.a[1],y),B=mk(m.b[0],m.b[1],y);
+    if(t>=A&&t<=B&&(!act||m.z>act.m.z))act={m:m,state:"aktiv",days:Math.round((mk(m.p[0],m.p[1],y)-t)/864e5)};}
+  if(act)return act;
+  let nx=null;
+  for(const m of METEORS){let A=mk(m.a[0],m.a[1],y),py=y;if(A<t){A=mk(m.a[0],m.a[1],y+1);py=y+1;}
+    if(!nx||A<nx.A)nx={m:m,A:A,py:py};}
+  return{m:nx.m,state:"n\u00e4chster",days:Math.round((mk(nx.m.p[0],nx.m.p[1],nx.py)-t)/864e5)};}
+function radAltAz(ms,raH,decD){const jd=ms/86400000+2440587.5,H=((_gmst(jd)+LON)-raH*15)*Math.PI/180,phi=LAT*Math.PI/180,de=decD*Math.PI/180;
+  const sa=Math.sin(phi)*Math.sin(de)+Math.cos(phi)*Math.cos(de)*Math.cos(H);
+  const az=(Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(phi)-Math.tan(de)*Math.cos(phi))*180/Math.PI+180+360)%360;
+  return{alt:Math.asin(Math.max(-1,Math.min(1,sa)))*180/Math.PI,az:az};}
+function meteorWindow(t0,t1,step,sunAltFn,radFn){let a=null,b=null,best=null,bAlt=-99,bAz=0;
+  for(let t=t0;t<=t1;t+=step){const su=sunAltFn(t);if(su==null)return null;const r=radFn(t);
+    if(su<-12&&r.alt>15){if(a==null)a=t;b=t;if(r.alt>bAlt){bAlt=r.alt;best=t;bAz=r.az;}}}
+  return a==null?null:{t0:a,t1:b,best:best,alt:bAlt,az:bAz};}
+function renderMeteors(){try{
+  const sec=document.getElementById("metSec"),bd=document.getElementById("metBody");if(!sec||!bd)return;
+  const now=new Date(),pk=meteorPick(now),m=pk.m;
+  const d0=new Date(now);d0.setHours(21,0,0,0);const t0=d0.getTime(),t1=t0+9*3600e3;
+  const sunAlt=ms=>{const mu=(window.satellite&&typeof _sunMu==="function")?_sunMu(ms):null;return mu==null?null:Math.asin(Math.max(-1,Math.min(1,mu)))*180/Math.PI;};
+  const win=meteorWindow(t0,t1,600e3,sunAlt,ms=>radAltAz(ms,m.ra,m.de));
+  let ccTxt="Bew\u00f6lkungsprognose l\u00e4dt \u2026",amp="";
+  const ly=window._ccLayers;
+  if(win&&ly&&ly.time&&ly.cloud_cover_low){let sm=0,n=0;
+    for(let i=0;i<ly.time.length;i++){const tm=new Date(ly.time[i]).getTime();
+      if(tm>=win.t0-1800e3&&tm<=win.t1+1800e3){const L=(+ly.cloud_cover_low[i]||0)/100,M=(+ly.cloud_cover_mid[i]||0)/100,Hc=(+ly.cloud_cover_high[i]||0)/100;sm+=1-(1-L)*(1-M)*(1-Hc);n++;}}
+    if(n){const p=Math.round(100*sm/n);ccTxt=(p<=30?"gute Chancen":p<=70?"durchwachsen":"schlechte Karten")+" \u00b7 \u00d8 "+p+"\u202f% bew\u00f6lkt";amp=p<=30?"ok":p<=70?"mid":"bad";}}
+  const mi=(typeof moonInfo==="function")?moonInfo(now):null;
+  const mip=(typeof moonInfo==="function"&&pk.days>0)?moonInfo(new Date(now.getFullYear(),m.p[0]-1,m.p[1])):null;
+  const fmt=t=>{const d=new Date(t);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+  const comp=a=>["N","NO","O","SO","S","SW","W","NW"][Math.round((((a%360)+360)%360)/45)%8];
+  const dTxt=pk.days>1?"(in "+pk.days+" Tagen)":pk.days===1?"(morgen Nacht!)":pk.days===0?"(heute Nacht!)":"(vor "+(-pk.days)+" Tagen)";
+  let h='<div class="met-box"><b>'+m.n+'</b> \u00b7 '+pk.state+' \u00b7 Aktivit\u00e4t '+m.a[1]+'.'+m.a[0]+'.\u2013'+m.b[1]+'.'+m.b[0]+'. \u00b7 Maximum: Nacht '+m.p[1]+'./'+(m.p[1]+1)+'.'+m.p[0]+'. '+dTxt+' \u00b7 ZHR ~'+m.z;
+  if(win)h+='<br>Heute Nacht: Fenster '+fmt(win.t0)+'\u2013'+fmt(win.t1)+' Uhr \u00b7 Radiant bis '+Math.round(win.alt)+'\u00b0 hoch im '+comp(win.az)+' (um '+fmt(win.best)+') \u00b7 Blick ~40\u00b0 neben den Radianten';
+  else h+='<br>Heute Nacht: kein dunkles Fenster mit ausreichend hohem Radianten';
+  h+='<br><span class="met-amp '+amp+'">'+ccTxt+'</span>';
+  if(mi&&mi.illum!=null)h+=' \u00b7 Mond heute '+mi.illum+'\u202f%';
+  if(mip&&mip.illum!=null)h+=' \u00b7 zum Maximum '+mip.illum+'\u202f%';
+  bd.innerHTML=h+'</div>';sec.classList.remove("hidden");
+}catch(e){console.warn("meteors",e&&e.message);}}
+setTimeout(renderMeteors,900);
 /* ===== ISS-Modul ===== */
 /* ===================== ISS-Überflüge (SGP4 via satellite.js) ===================== */
 const ISS_LAT=LOC.lat, ISS_LON=LOC.lon, ISS_ALT=LOC.isWettenberg?0.2:0, ISS_AU=149597870.7, ISS_RE=6371;
