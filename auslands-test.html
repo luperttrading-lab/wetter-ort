@@ -1,0 +1,77 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Auslands-Test wetter-ort</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0e1420;color:#e8edf5;font:15px/1.5 -apple-system,system-ui,sans-serif;padding:16px 14px 40px}
+h1{font-size:19px;margin:4px 0 2px}
+.sub{color:#8fa0b8;font-size:12.5px;margin-bottom:14px}
+.locs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.locs button{background:#1b2534;border:1px solid #2c3a52;color:#e8edf5;border-radius:999px;padding:9px 14px;font-size:14px}
+.locs button.on{background:#2563eb;border-color:#2563eb}
+.man{display:flex;gap:8px;margin-bottom:14px}
+.man input{flex:1;background:#141c2a;border:1px solid #2c3a52;border-radius:10px;color:#e8edf5;padding:10px;font-size:15px}
+.man button{background:#2563eb;border:0;color:#fff;border-radius:10px;padding:10px 16px;font-size:14px}
+.card{background:#141c2a;border:1px solid #26334a;border-radius:14px;padding:12px 13px;margin-bottom:9px}
+.card b{font-size:14.5px}
+.st{float:right;font-weight:700}
+.ok{color:#4ade80}.bad{color:#f87171}.mid{color:#fbbf24}
+.det{color:#9fb0c8;font-size:12.8px;margin-top:4px;word-break:break-word}
+.note{color:#8fa0b8;font-size:12px;margin-top:16px;line-height:1.55}
+</style></head><body>
+<h1>Auslands-Test</h1>
+<div class="sub">feuert exakt die wetter-ort-Datenabrufe f\u00fcr den gew\u00e4hlten Ort</div>
+<div class="locs" id="locs"></div>
+<div class="man"><input id="mlat" inputmode="decimal" placeholder="Breite, z.\u2009B. 46.0037"><input id="mlon" inputmode="decimal" placeholder="L\u00e4nge"><button onclick="runManual()">Test</button></div>
+<div id="out"></div>
+<div class="note"><b>Lesehilfe:</b> Bright Sky = DWD-Dienst; im Ausland liefert er (wenn \u00fcberhaupt) MOSMIX-<i>Prognosen</i> statt Messungen \u2013 entscheidend ist die Spalte \u201eTyp\u201c. Radar/Warnungen sind Deutschland-Dienste, dort ist \u2717 im Ausland erwartet und die App blendet die Kacheln selbst aus. minutely_15 zeigt, ob der Ort im ICON-D2-Gebiet liegt (Regen-Nowcast).</div>
+<script>
+'use strict';
+var LOCS=[["Z\u00fcrich",47.3769,8.5417],["Lugano",46.0037,8.9511],["Bozen",46.4983,11.3548],["Mailand",45.4642,9.1900],["Rom",41.9028,12.4964],["Wettenberg (Referenz)",50.6069,8.6503]];
+var out=document.getElementById('out'),locsEl=document.getElementById('locs');
+LOCS.forEach(function(l,i){var b=document.createElement('button');b.textContent=l[0];b.onclick=function(){run(l[0],l[1],l[2],b);};locsEl.appendChild(b);});
+function runManual(){var la=parseFloat(document.getElementById('mlat').value),lo=parseFloat(document.getElementById('mlon').value);if(isFinite(la)&&isFinite(lo))run('Manuell',la,lo,null);}
+function fj(url,ms){var to=new Promise(function(res){setTimeout(function(){res({__timeout:true});},ms||10000);});
+  var f=fetch(url).then(function(r){return r.ok?r.json():{__http:r.status};}).catch(function(e){return {__err:String(e&&e.message||e)};});
+  return Promise.race([f,to]);}
+function card(t,st,cls,det){var d=document.createElement('div');d.className='card';d.innerHTML='<b>'+t+'</b><span class="st '+cls+'">'+st+'</span><div class="det">'+det+'</div>';out.appendChild(d);}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+async function run(name,la,lo,btn){
+  Array.prototype.forEach.call(locsEl.children,function(b){b.classList.toggle('on',b===btn);});
+  out.innerHTML='<div class="card"><b>'+name+'</b><div class="det">'+la.toFixed(4)+', '+lo.toFixed(4)+' \u2013 Tests laufen \u2026</div></div>';
+  var res=[];
+  // 1) Bright Sky current_weather
+  var c=await fj('https://api.brightsky.dev/current_weather?lat='+la+'&lon='+lo,10000);
+  if(c.__timeout||c.__err||c.__http)res.push(['Bright Sky \u00b7 aktuell','\u2717','bad','Fehler: '+(c.__http||c.__err||'Timeout')]);
+  else{var s=(c.sources&&c.sources[0])||{};res.push(['Bright Sky \u00b7 aktuell','\u2713','ok','Station: '+(s.station_name||'?')+' \u00b7 '+(s.distance!=null?(s.distance/1000).toFixed(1)+' km':'?')+' \u00b7 Typ: '+(s.observation_type||'?')+' \u00b7 '+(c.weather&&c.weather.temperature!=null?c.weather.temperature+'\u2009\u00b0C':'kein Wert')]);}
+  // 2) Bright Sky weather heute (Stundendaten inkl. Bewoelkung -> Saeulen/Simulation)
+  var w=await fj('https://api.brightsky.dev/weather?lat='+la+'&lon='+lo+'&date='+today()+'&tz=Europe/Berlin',12000);
+  if(w.__timeout||w.__err||w.__http)res.push(['Bright Sky \u00b7 Stundendaten','\u2717','bad','Fehler: '+(w.__http||w.__err||'Timeout')]);
+  else{var arr=w.weather||[],cc=arr.filter(function(x){return x&&x.cloud_cover!=null;}).length;
+    var types={};(w.sources||[]).forEach(function(x){if(x&&x.observation_type)types[x.observation_type]=1;});
+    var s0=(w.sources&&w.sources[0])||{};
+    res.push(['Bright Sky \u00b7 Stundendaten',arr.length?'\u2713':'\u2717',arr.length?(cc>12?'ok':'mid'):'bad',
+      arr.length+' Stunden \u00b7 '+cc+'\u00d7 Bew\u00f6lkung \u00b7 Typ: '+(Object.keys(types).join(', ')||'?')+' \u00b7 Station: '+(s0.station_name||'?')+' ('+(s0.distance!=null?(s0.distance/1000).toFixed(0)+' km':'?')+')']);}
+  // 3) Bright Sky Radar (RADOLAN)
+  var r=await fj('https://api.brightsky.dev/radar?lat='+la+'&lon='+lo+'&distance=1000&format=plain&tz=Europe/Berlin&date='+encodeURIComponent(new Date().toISOString()),12000);
+  if(r.__timeout||r.__err||r.__http)res.push(['DWD-Radar (Nowcast)','\u2717','mid','nicht verf\u00fcgbar ('+(r.__http||r.__err||'Timeout')+') \u2013 App blendet Kachel aus']);
+  else{var rad=(r.radar&&r.radar.length)||0;res.push(['DWD-Radar (Nowcast)',rad?'\u2713':'\u2717',rad?'ok':'mid',rad?rad+' Zeitschritte':'leer \u2013 au\u00dferhalb RADOLAN']);}
+  // 4) DWD-Warnungen
+  var al=await fj('https://api.brightsky.dev/alerts?lat='+la+'&lon='+lo,10000);
+  if(al.__timeout||al.__err||al.__http)res.push(['DWD-Warnungen','\u2013','mid','nicht verf\u00fcgbar ('+(al.__http||al.__err||'Timeout')+')']);
+  else res.push(['DWD-Warnungen','\u2713','ok',((al.alerts&&al.alerts.length)||0)+' aktive Warnungen (0 = ok)']);
+  // 5) Open-Meteo CAMS: UV clear sky
+  var u=await fj('https://air-quality-api.open-meteo.com/v1/air-quality?latitude='+la+'&longitude='+lo+'&hourly=uv_index_clear_sky,uv_index&timezone=Europe%2FBerlin&forecast_days=1',10000);
+  if(u.__timeout||u.__err||u.__http||!u.hourly)res.push(['Open-Meteo \u00b7 UV/CAMS','\u2717','bad','Fehler: '+(u.__http||u.__err||'keine Daten')]);
+  else{var mx=Math.max.apply(null,(u.hourly.uv_index_clear_sky||[0]).map(function(v){return v||0;}));
+    res.push(['Open-Meteo \u00b7 UV/CAMS','\u2713','ok','Klarhimmel-Max heute: '+mx.toFixed(1)]);}
+  // 6) Open-Meteo Forecast: Schichten + ICON-D2-Nowcast
+  var f=await fj('https://api.open-meteo.com/v1/forecast?latitude='+la+'&longitude='+lo+'&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&minutely_15=precipitation&forecast_days=1&timezone=Europe%2FBerlin',10000);
+  if(f.__timeout||f.__err||f.__http||!f.hourly)res.push(['Open-Meteo \u00b7 Schichten/Nowcast','\u2717','bad','Fehler: '+(f.__http||f.__err||'keine Daten')]);
+  else{var lay=f.hourly.cloud_cover_low?'\u2713 Wolkenschichten':'\u2717 Schichten';
+    var m15=(f.minutely_15&&f.minutely_15.precipitation)||[],m15n=m15.filter(function(v){return v!=null;}).length;
+    res.push(['Open-Meteo \u00b7 Schichten/Nowcast','\u2713','ok',lay+' \u00b7 minutely_15: '+(m15n?m15n+' Werte (ICON-D2-Gebiet \u2713)':'fehlt (au\u00dferhalb ICON-D2)')]);}
+  out.innerHTML='<div class="card"><b>'+name+'</b><div class="det">'+la.toFixed(4)+', '+lo.toFixed(4)+'</div></div>';
+  res.forEach(function(x){card(x[0],x[1],x[2],x[3]);});
+}
+</script></body></html>
