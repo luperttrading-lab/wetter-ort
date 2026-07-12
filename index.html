@@ -309,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.27</span>
+      <span class="ver">v2.28</span>
     </div>
   </header>
 
@@ -532,9 +532,39 @@ async function load(silent){
     tryCurrent(obsSrc);
     _lastFull=_lastFast=Date.now();
     loadExtras();
+    backfillPast();
   }catch(err){console.warn("Live-Abruf:",err);
     if(!silent){el("stErrorMsg").textContent="Keine Verbindung zur Wetterstation ("+err.message+").";showState("error");}}
   finally{el("refresh").classList.remove("spin");_loading=false;}
+}
+let _bfKey=""; // v2.28: Auslands-Stationen ohne Archiv -> Vergangenheit (72h) aus Open-Meteo-Modell nachladen
+async function backfillPast(){
+  try{
+    const key=LAT+"/"+LON;
+    if(_bfKey===key||!fullRows||!fullRows.length)return;
+    const now=Date.now(),first=new Date(fullRows[0].timestamp).getTime();
+    if((now-first)/3600e3>=24)return; // genug Historie da (deutsche Stationen)
+    _bfKey=key;
+    const j=await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,cloud_cover,pressure_msl&past_days=3&forecast_days=1&timezone=Europe%2FBerlin`,10000);
+    const h=j&&j.hourly;if(!h||!h.time)return;
+    const have=new Set(fullRows.map(r=>new Date(r.timestamp).getTime()));
+    const add=[];
+    for(let i=0;i<h.time.length;i++){
+      const t=new Date(h.time[i]).getTime();
+      if(t>=first||t>now||have.has(t)||h.temperature_2m[i]==null)continue;
+      add.push({timestamp:new Date(t).toISOString(),temperature:h.temperature_2m[i],
+        relative_humidity:h.relative_humidity_2m?h.relative_humidity_2m[i]:null,
+        dew_point:h.dew_point_2m?h.dew_point_2m[i]:null,
+        cloud_cover:h.cloud_cover?h.cloud_cover[i]:null,
+        pressure_msl:h.pressure_msl?h.pressure_msl[i]:null,_fc:false,_om:true});
+    }
+    if(!add.length)return;
+    add.sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+    fullRows=add.concat(fullRows);
+    chartRows=add.concat(chartRows||[]).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+    chartInit=false;stripInit=false;
+    render(fullRows.slice(-WINDOW_HOURS),fullRows,window._lastSrc||{},false);
+  }catch(e){console.warn("backfill",e&&e.message);}
 }
 async function tryCurrent(obsSrc){
   try{
@@ -557,24 +587,19 @@ function render(rows,all,src,demo){
   isDemo=demo; lastRows=rows; showState(null);
   const cur=rows.at(-1);
   const today=isToday(cur.timestamp);
-  { // v2.27: Label nach Datenart - im Ausland liefert Bright Sky MOSMIX-Prognosen statt Messungen
-    const _st=el("stationTxt"),_ot=String((src&&src.observation_type)||"").toLowerCase();
-    if(_st){
-      if(_ot==="forecast"){
-        const nm=String(src.station_name||"MOSMIX").toLowerCase().replace(/(^|[\s\-\/])\S/g,function(m){return m.toUpperCase();});
-        const km=(src.distance!=null&&src.distance>15000)?" \u00b7 "+(src.distance/1000).toFixed(0)+"\u202fkm":"";
-        _st.textContent="MOSMIX-Prognose \u00b7 "+nm+km;
-      } else _st.textContent="Live \u00b7 DWD-Station";
-    }
-  }
+  window._lastSrc=src; // v2.28: fuer Backfill-Rerender; Label setzt der eine Schreiber unten
 
   // Stationszeile
   const dist=src.distance!=null?(src.distance/1000).toLocaleString("de-DE",{maximumFractionDigits:1})+" km":"";
-  el("stationTxt").textContent=(demo?"Demo":"Live")+(src.dwd_station_id?" · DWD "+src.dwd_station_id:"")+(dist?" · "+dist:"");
+  {const _ot=String((src&&src.observation_type)||"").toLowerCase();
+    const _nm=src.station_name&&!src.dwd_station_id?" · "+String(src.station_name).toLowerCase().replace(/(^|[\s\-\/])\S/g,function(m){return m.toUpperCase();}):"";
+    el("stationTxt").textContent=(demo?"Demo":(_ot==="forecast"?"MOSMIX-Prognose":"Live"))+(src.dwd_station_id?" · DWD "+src.dwd_station_id:_nm)+(dist?" · "+dist:"");} // v2.28
 
   // aktuelle Werte (Snapshot)
   const wind=cur.wind_speed!=null?cur.wind_speed:latestOf(all,"wind_speed");
-  const rh=cur.relative_humidity!=null?cur.relative_humidity:latestOf(all,"relative_humidity");
+  let rh=cur.relative_humidity!=null?cur.relative_humidity:latestOf(all,"relative_humidity");
+  if(rh==null){const _T=cur.temperature,_Td=cur.dew_point!=null?cur.dew_point:latestOf(all,"dew_point"); // v2.28: Magnus aus Taupunkt (SYNOP ohne RH)
+    if(_T!=null&&_Td!=null)rh=Math.max(1,Math.min(100,Math.round(100*Math.exp(17.62*_Td/(243.12+_Td)-17.62*_T/(243.12+_T)))));}
   snap={temp:cur.temperature,icon:cur.icon,ts:cur.timestamp,rh,wind,
     dir:cur.wind_direction!=null?cur.wind_direction:latestOf(all,"wind_direction"),
     gust:latestOf(all,"wind_gust_speed"),press:latestOf(all,"pressure_msl"),
