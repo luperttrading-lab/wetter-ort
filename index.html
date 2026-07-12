@@ -309,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.30</span>
+      <span class="ver">v2.31</span>
     </div>
   </header>
 
@@ -338,7 +338,7 @@
     <div class="sect-row"><span class="sect">Stündlich</span><button class="act-btn" id="stripJump" aria-label="Zurück zu jetzt"></button></div>
     <div class="strip-card"><div class="strip" id="strip"></div></div>
     <div class="sect-row"><span class="sect">Temperaturverlauf</span><button class="act-btn" id="chartJump" aria-label="Zurück zu jetzt"></button></div>
-    <div class="chart-card"><div class="chart-row"><canvas id="chartAxis"></canvas><div class="chart-scroll" id="chartScroll"><canvas id="chart"></canvas></div><div class="chart-cursor" id="chartCursor"><div class="cc-val" id="ccVal"></div><div class="cc-line"></div><div class="cc-dot" id="ccDot"></div><div class="cc-time" id="ccTime"></div></div></div><div class="uvnote" style="margin-top:6px">dünne blaugrüne Linie = gefühlte Temperatur (sichtbar, wo sie abweicht: Hitze/Schwüle bzw. Wind)</div></div>
+    <div class="chart-card"><div class="chart-row"><canvas id="chartAxis"></canvas><div class="chart-scroll" id="chartScroll"><canvas id="chart"></canvas></div><div class="chart-cursor" id="chartCursor"><div class="cc-val" id="ccVal"></div><div class="cc-line"></div><div class="cc-dot" id="ccDot"></div><div class="cc-time" id="ccTime"></div></div></div></div>
     <div id="nowcastSec" class="hidden"><div class="sect">Niederschlag · nächste 2 Std</div><div class="nowcard" id="nowcard"></div></div>
     <div id="rainHrSec" class="hidden"><div class="sect">Regen · nächste 24 Std</div><div class="nowcard" id="rainHrCard"></div></div>
     <div id="umkreisSec" class="hidden"><div class="sect">Regen im Umkreis · heute</div><div class="nowcard" id="umkreisCard"></div></div>
@@ -696,9 +696,7 @@ function drawChart(rows){
   cv.style.width=W+"px";cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const x0=lead,x1=W-lead,y0=padT,y1=H-padB;
   const temps=rows.map(r=>r.temperature);
-  const felts=rows.map(r=>feelsLike(r.temperature,r.relative_humidity,r.wind_speed)); // v2.30: gefuehlte Temperatur als duenne Linie
-  const _dom=temps.concat(felts.filter(v=>v!=null));
-  let lo=Math.floor(Math.min(..._dom))-1,hi=Math.ceil(Math.max(..._dom))+1;if(hi-lo<5)hi=lo+5;
+  let lo=Math.floor(Math.min(...temps))-1,hi=Math.ceil(Math.max(...temps))+1;if(hi-lo<5)hi=lo+5;
   const X=t=>x0+(x1-x0)*((t-tMin)/(tMax-tMin)),Y=v=>y1-(y1-y0)*((v-lo)/(hi-lo)),nowMs=Date.now();
   let obsMs=tMin;for(let i=rows.length-1;i>=0;i--){if(T(rows[i])<=nowMs){obsMs=T(rows[i]);break;}}
   const nowX=(obsMs>=tMin&&obsMs<=tMax)?X(obsMs):null;
@@ -719,12 +717,6 @@ function drawChart(rows){
   // Fläche
   ctx.beginPath();ctx.moveTo(X(tMin),Y(rows[0].temperature));rows.forEach(r=>ctx.lineTo(X(T(r)),Y(r.temperature)));ctx.lineTo(X(tMax),y1);ctx.lineTo(X(tMin),y1);ctx.closePath();
   const fg=ctx.createLinearGradient(0,y0,0,y1);fg.addColorStop(0,rgba(thermal(hi),.16));fg.addColorStop(1,rgba(thermal(lo),.02));ctx.fillStyle=fg;ctx.fill();
-  // gefuehlte Temperatur: duenn, blaugruen, unter der Hauptlinie (v2.30)
-  ctx.lineJoin="round";ctx.lineCap="round";ctx.lineWidth=1.3;ctx.strokeStyle="rgba(38,122,140,.85)";
-  for(let i=1;i<rows.length;i++){const fa=felts[i-1],fb=felts[i];if(fa==null||fb==null)continue;
-    ctx.setLineDash(T(rows[i])>nowMs?[3,3]:[]);
-    ctx.beginPath();ctx.moveTo(X(T(rows[i-1])),Y(fa));ctx.lineTo(X(T(rows[i])),Y(fb));ctx.stroke();}
-  ctx.setLineDash([]);
   // Linie: beobachtet durchgezogen, Prognose gestrichelt
   ctx.lineJoin="round";ctx.lineCap="round";ctx.lineWidth=2.2;
   for(let i=1;i<rows.length;i++){ctx.setLineDash(T(rows[i])>nowMs?[4,3]:[]);ctx.strokeStyle=rgb(thermal((rows[i-1].temperature+rows[i].temperature)/2));ctx.beginPath();ctx.moveTo(X(T(rows[i-1])),Y(rows[i-1].temperature));ctx.lineTo(X(T(rows[i])),Y(rows[i].temperature));ctx.stroke();}
