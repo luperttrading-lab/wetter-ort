@@ -309,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.26</span>
+      <span class="ver">v2.27</span>
     </div>
   </header>
 
@@ -557,6 +557,16 @@ function render(rows,all,src,demo){
   isDemo=demo; lastRows=rows; showState(null);
   const cur=rows.at(-1);
   const today=isToday(cur.timestamp);
+  { // v2.27: Label nach Datenart - im Ausland liefert Bright Sky MOSMIX-Prognosen statt Messungen
+    const _st=el("stationTxt"),_ot=String((src&&src.observation_type)||"").toLowerCase();
+    if(_st){
+      if(_ot==="forecast"){
+        const nm=String(src.station_name||"MOSMIX").toLowerCase().replace(/(^|[\s\-\/])\S/g,function(m){return m.toUpperCase();});
+        const km=(src.distance!=null&&src.distance>15000)?" \u00b7 "+(src.distance/1000).toFixed(0)+"\u202fkm":"";
+        _st.textContent="MOSMIX-Prognose \u00b7 "+nm+km;
+      } else _st.textContent="Live \u00b7 DWD-Station";
+    }
+  }
 
   // Stationszeile
   const dist=src.distance!=null?(src.distance/1000).toLocaleString("de-DE",{maximumFractionDigits:1})+" km":"";
@@ -608,7 +618,7 @@ function paintHero(s,demo,today,d){
   el("staleBox").classList.toggle("on",!today);
 
   const badge=el("badge");badge.className="badge"+(demo?" demo":(!today?" stale":""));
-  badge.textContent=demo?"Demo-Snapshot":(!today?"Veraltet":(s._live?"Live · aktuell":"Live · DWD"));
+  badge.textContent=demo?"Demo-Snapshot":(!today?"Veraltet":(s._live?"Live · aktuell":(s._fc?"Prognose":"Live · DWD")));
 
   if(!today){el("staleSub").innerHTML="Letzter Messwert: <b>"+dateWD(s.ts)+"</b>, "+timeHM(s.ts)+" Uhr ("+ageText(s.ts)+")";el("heat").classList.remove("on");return;}
 
