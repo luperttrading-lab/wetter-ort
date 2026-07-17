@@ -309,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.32</span>
+      <span class="ver">v2.33</span>
     </div>
   </header>
 
@@ -1202,7 +1202,7 @@ function renderUmkreis(j){
   requestAnimationFrame(()=>{
     const ank=+j.summe_mm, fkt=span>0?Math.min(Math.max(UMK_ZIEL/span,1),UMK_KMAX):1;  // Standort-Anker + adaptiver Faktor
     umkFill(el("umkCvA"),g,mm=>umkColor(ank+(mm-ank)*fkt),SX,SY);            // Menge (Blau 0-50): Kontrast um eigenen Wert verstaerkt
-    umkFill(el("umkCvB"),g,mm=>umkTeal(mx>0?Math.pow(Math.max(0,mm)/mx,0.8):0),SX,SY);      // v2.32: absolut ab 0 mm - Weiss = wirklich trocken; gleichmaessige Felder bleiben gleichmaessig gruen
+    umkFill(el("umkCvB"),g,mm=>umkTeal(0.22+0.78*(span>0?(mm-mn)/span:0.5)),SX,SY);      // v2.33: relativ (Muster sichtbar), aber Rampe startet bei Hellgruen statt Weiss - Minimum heisst "weniger", nicht "trocken"
     const pos=[16.6667,50,83.3333];let lbls="";
     g.forEach((row,i)=>row.forEach((v,k)=>{
       const dunkel=v<15;                         // heller Grund (wenig Regen) -> dunkle Zahl
