@@ -309,7 +309,7 @@
           <span class="ico-refresh"></span>
         </div>
       </div>
-      <span class="ver">v2.40</span>
+      <span class="ver">v2.41</span>
     </div>
   </header>
 
@@ -2351,9 +2351,17 @@ function issSunlit(eci,sp){          // ISS außerhalb des Erdschattens?
 function issMag(range){return -1.8 + 5*Math.log10(Math.max(range,1)/1000);}
 const ISS_DIRS=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 function issDir(a){return ISS_DIRS[Math.round(a/22.5)%16];}
-function issComputePasses(satrec,days,fromDate){
-  const start=fromDate?new Date(fromDate):new Date(); const passes=[]; let cur=null;
-  for(let s=0;s<days*86400;s+=10){
+let _issHorizonDays=5; // v2.41
+function issWhyInvisible(p){ // v2.41: warum ist dieser Ueberflug unsichtbar?
+  if(!p||p.visible)return"";
+  if(p.sunAlt==null)return"nicht sichtbar";
+  if(p.sunAlt>=0)return"nicht sichtbar \u2013 Tageslicht (Sonne "+Math.round(p.sunAlt)+"\u00b0 hoch)";
+  if(p.sunAlt>=-6)return"nicht sichtbar \u2013 D\u00e4mmerung noch zu hell";
+  return"nicht sichtbar \u2013 ISS im Erdschatten";
+}
+function issComputePasses(satrec,days,fromDate,step){
+  const start=fromDate?new Date(fromDate):new Date(); const passes=[]; let cur=null; const dt=step||10;
+  for(let s=0;s<days*86400;s+=dt){
     const t=new Date(start.getTime()+s*1000), r=issLook(satrec,t); if(!r)continue;
     if(r.el>10){
       if(!cur)cur={start:t,startAz:r.az,maxEl:r.el,maxAz:r.az,peakT:t,peakEci:r.eci,peakRange:r.range,end:t,endAz:r.az,track:[]};
@@ -2429,10 +2437,10 @@ function issMainHTML(p,now){
     <div class="iss-cd" id="issCd">${issCountdown(p.start,now)}</div>
     <div class="iss-l1">${issDir(p.startAz)} → ${issDir(p.endAz)} · ${Math.round(p.durSec/60)} Min</div>
     <div class="iss-l1">max. ${Math.round(p.maxEl)}° hoch · ${p.mag.toFixed(1).replace(".",",")} mag</div>
-    <div class="iss-amp"><span class="iss-dot" style="background:${acol}"></span><span style="color:${acol};font-weight:700">Himmel ${atxt}${good?' → gut sichtbar':''}</span></div></div></div>`;
+    <div class="iss-amp">${p.visible?`<span class="iss-dot" style="background:${acol}"></span><span style="color:${acol};font-weight:700">Himmel ${atxt}${good?' → gut sichtbar':''}</span>`:`<span class="iss-dot" style="background:#9aa7b8"></span><span style="color:#5c6b80;font-weight:700">${issWhyInvisible(p)}</span>`}</div></div></div>`;
 }
-function issListHTML(passes,now){
-  if(!passes.length)return `<div class="iss-empty">Keine weiteren sichtbaren Überflüge in den nächsten Tagen.</div>`;
+function issListHTML(passes,now,mainVis){
+  if(!passes.length)return `<div class="iss-empty">Keine ${mainVis?'weiteren ':''}sichtbaren Überflüge in den nächsten ${_issHorizonDays} Tagen.</div>`;
   let h=`<div class="iss-lhead"><span>Wann</span><span>Richtung</span><span>Höhe</span><span>Sicht</span></div>`;
   for(const p of passes){
     const cloud=issCloudAt(p.start), [acol,atxt]=issAmpel(cloud), grob=(p.start-now)>3*86400000;
@@ -2449,7 +2457,7 @@ function renderIss(){
   const main=visible[0]||upcoming[0];
   el('issMain').innerHTML=issMainHTML(main,now);
   const rest=visible.filter(p=>p!==main).slice(0,6);
-  el('issList').innerHTML=issListHTML(rest,now);
+  el('issList').innerHTML=issListHTML(rest,now,!!main.visible);
 }
 async function fetchIssTLE(){
   const r=await fetch('https://api.wheretheiss.at/v1/satellites/25544/tles?format=text');
@@ -2465,9 +2473,18 @@ async function loadIss(){
     el('issSec').classList.remove('hidden');
     el('issMain').innerHTML='<div class="iss-load">ISS-Bahn wird berechnet…</div>'; el('issList').innerHTML='';
     _issSat=await fetchIssTLE();
-    _issPasses=issComputePasses(_issSat,5);
+    _issPasses=issComputePasses(_issSat,5);_issHorizonDays=5;
     fetchIssClouds().then(renderIss).catch(e=>console.warn('issClouds',e.message));
     renderIss();
+    setTimeout(()=>{try{ // v2.41: kein sichtbarer Ueberflug in 5 Tagen -> grober Zweitlauf (30-s-Schritte) bis Tag 12
+      if(!_issSat||!_issPasses)return;
+      const nw=new Date();
+      if(_issPasses.some(p=>p.end>nw&&p.visible))return;
+      const lastEnd=_issPasses.length?_issPasses[_issPasses.length-1].end:0;
+      const ext=issComputePasses(_issSat,7,new Date(Date.now()+5*864e5),30).filter(p=>p.start>lastEnd);
+      _issHorizonDays=12;if(ext.length)_issPasses=_issPasses.concat(ext);
+      renderIss();
+    }catch(e){console.warn('issExt',e&&e.message);}},1500);
     if(_issTimer)clearInterval(_issTimer);
     _issTimer=setInterval(()=>{
       const cd=el('issCd'); if(cd&&_issPasses){const now=new Date();const up=_issPasses.filter(p=>p.end>now);const vis=up.filter(p=>p.visible);const m=vis[0]||up[0];if(m){if(m.start<=now||cd.dataset.t!=String(m.start.getTime()))renderIss();else cd.textContent=issCountdown(m.start,now);}}
